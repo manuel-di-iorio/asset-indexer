@@ -14,6 +14,7 @@ function setupWatcher(db, mainWindow, libraryPath, libraryId, ignoreRegex) {
   let ignoreFn = defaultIgnore;
   if (ignoreRegex && ignoreRegex.trim()) {
     try {
+      if (ignoreRegex.length > 200) throw new Error('Regex too long');
       const re = new RegExp(ignoreRegex, 'i');
       ignoreFn = (p) => {
         if (defaultIgnore(p)) return true;
@@ -32,17 +33,16 @@ function setupWatcher(db, mainWindow, libraryPath, libraryId, ignoreRegex) {
 
   watcher.on('add', (filePath) => {
     const ext = path.extname(filePath).toLowerCase();
-    if (ALL_EXTENSIONS.includes(ext)) {
-      try {
-        const stat = fs.statSync(filePath);
-        const category = getAssetCategory(ext);
-        db.prepare(`
-          INSERT OR REPLACE INTO assets (library_id, file_path, file_name, file_ext, file_size, modified_date, created_date, category)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(libraryId, filePath, path.basename(filePath), ext, stat.size, stat.mtime.toISOString(), stat.birthtime.toISOString(), category);
-        mainWindow?.webContents.send('asset-added', { libraryId, filePath });
-      } catch (e) {}
-    }
+    if (!ALL_EXTENSIONS.includes(ext)) return;
+    try {
+      const stat = fs.statSync(filePath);
+      const category = getAssetCategory(ext);
+      db.prepare(`
+        INSERT OR REPLACE INTO assets (library_id, file_path, file_name, file_ext, file_size, modified_date, created_date, category)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(libraryId, filePath, path.basename(filePath), ext, stat.size, stat.mtime.toISOString(), stat.birthtime.toISOString(), category);
+      mainWindow?.webContents.send('asset-added', { libraryId, filePath });
+    } catch (e) {}
   });
 
   watcher.on('change', (filePath) => {

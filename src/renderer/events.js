@@ -12,13 +12,22 @@ import { showAddCollectionModal } from './modals/add-collection.js';
 import { showAddToCollectionModal } from './modals/add-to-collection.js';
 
 let searchTimeout = null;
+let requestId = 0;
+
+function safeLoadAssets() {
+  const id = ++requestId;
+  loadAssets().then(() => {
+    if (id === requestId) renderAssets();
+  });
+}
 
 function doFullRefresh() {
-  loadLibraries().then(() => { renderSources(); updateBreadcrumb(); });
-  loadTags().then(() => renderTags());
-  loadCollections().then(() => renderCollections());
+  const id = ++requestId;
+  loadLibraries().then(() => { if (id === requestId) { renderSources(); updateBreadcrumb(); } });
+  loadTags().then(() => { if (id === requestId) renderTags(); });
+  loadCollections().then(() => { if (id === requestId) renderCollections(); });
   loadCategoryCounts();
-  loadAssets().then(() => renderAssets());
+  loadAssets().then(() => { if (id === requestId) renderAssets(); });
 }
 
 export function initEventListeners() {
@@ -51,7 +60,7 @@ export function initEventListeners() {
     state.tagId = null;
     state.libraryIds = [];
     updateSidebarActive();
-    loadAssets().then(() => renderAssets());
+    safeLoadAssets();
     updateBreadcrumb();
   });
 
@@ -59,13 +68,13 @@ export function initEventListeners() {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
       state.searchQuery = e.target.value;
-      loadAssets().then(() => renderAssets());
+      safeLoadAssets();
     }, 200);
   });
 
   document.getElementById('sort-select').addEventListener('change', (e) => {
     state.sortBy = e.target.value;
-    loadAssets().then(() => renderAssets());
+    safeLoadAssets();
   });
 
   document.getElementById('btn-grid-view').addEventListener('click', () => {
@@ -94,7 +103,7 @@ export function initEventListeners() {
     if (!state.selectedAsset) return;
     await window.api.toggleFavorite(state.selectedAsset.id);
     await selectAsset(state.selectedAsset.id);
-    loadAssets().then(() => renderAssets());
+    safeLoadAssets();
     loadCategoryCounts();
   });
 
@@ -103,9 +112,9 @@ export function initEventListeners() {
   });
 
   window.api.onAssetAdded(() => doFullRefresh());
-  window.api.onAssetUpdated(() => { loadAssets().then(() => renderAssets()); });
+  window.api.onAssetUpdated(() => safeLoadAssets());
   window.api.onAssetRemoved(() => {
-    loadAssets().then(() => renderAssets());
+    safeLoadAssets();
     loadCategoryCounts();
     loadLibraries().then(() => renderSources());
     if (state.selectedAsset) {
@@ -119,7 +128,7 @@ export function initEventListeners() {
 
   document.addEventListener('sidebar-update', () => {
     updateSidebarActive();
-    loadAssets().then(() => renderAssets());
+    safeLoadAssets();
     updateBreadcrumb();
     renderSources();
     renderTags();
@@ -129,7 +138,7 @@ export function initEventListeners() {
   document.addEventListener('sidebar-refresh', () => {
     loadTags().then(() => renderTags());
     loadCollections().then(() => renderCollections());
-    loadAssets().then(() => renderAssets());
+    safeLoadAssets();
     loadCategoryCounts();
   });
 
@@ -141,6 +150,6 @@ export function initEventListeners() {
     if (e.detail && e.detail.assetId) {
       await selectAsset(e.detail.assetId);
     }
-    loadAssets().then(() => renderAssets());
+    safeLoadAssets();
   });
 }

@@ -2,6 +2,9 @@ import { defineConfig } from 'vite'
 import electron from 'vite-plugin-electron'
 
 export default defineConfig({
+  build: {
+    emptyOutDir: false,
+  },
   plugins: [
     electron([
       {

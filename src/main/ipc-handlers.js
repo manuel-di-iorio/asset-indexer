@@ -1,11 +1,80 @@
 const path = require('path');
 const fs = require('fs');
-const { ipcMain, dialog, shell } = require('electron');
+const crypto = require('crypto');
+const { ipcMain, dialog, shell, nativeImage } = require('electron');
 const { getAssetCategory } = require('./constants');
 const { scanDirectory } = require('./scanner');
 const { setupWatcher, stopWatcher } = require('./watchers');
 
-function registerIpcHandlers(db, getMainWindow) {
+const THUMB_CACHE_DIR = null;
+
+function getThumbCacheDir(app) {
+  if (!THUMB_CACHE_DIR) {
+    const dir = path.join(app.getPath('userData'), 'thumbnails');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    return dir;
+  }
+  return THUMB_CACHE_DIR;
+}
+
+function getThumbCachePath(filePath, cacheDir) {
+  const hash = crypto.createHash('md5').update(filePath.toLowerCase()).digest('hex');
+  return path.join(cacheDir, `${hash}.jpg`);
+}
+
+function getCachedThumbnail(filePath, cacheDir) {
+  const thumbPath = getThumbCachePath(filePath, cacheDir);
+  if (fs.existsSync(thumbPath)) {
+    try {
+      const data = fs.readFileSync(thumbPath);
+      return `data:image/jpeg;base64,${data.toString('base64')}`;
+    } catch (e) {}
+  }
+  return null;
+}
+
+function generateThumbnail(filePath, cacheDir) {
+  try {
+    const stat = fs.statSync(filePath);
+    if (stat.size > 10 * 1024 * 1024) return null;
+
+    const img = nativeImage.createFromPath(filePath);
+    if (img.isEmpty()) return null;
+
+    const resized = img.resize({ width: 200, quality: 'good' });
+    const jpegBuf = resized.toJPEG(80);
+    const thumbPath = getThumbCachePath(filePath, cacheDir);
+    fs.writeFileSync(thumbPath, jpegBuf);
+    return `data:image/jpeg;base64,${jpegBuf.toString('base64')}`;
+  } catch (e) {
+    return null;
+  }
+}
+
+const countCache = { data: null, dirty: true };
+
+function invalidateCountCache() {
+  countCache.dirty = true;
+}
+
+function getCachedCategoryCounts(db) {
+  if (!countCache.dirty && countCache.data) return countCache.data;
+  const counts = {};
+  const rows = db.prepare('SELECT category, COUNT(*) as count FROM assets GROUP BY category').all();
+  rows.forEach(r => counts[r.category] = r.count);
+  countCache.data = counts;
+  countCache.dirty = false;
+  return counts;
+}
+
+function getCachedTotalAssets(db) {
+  if (!countCache.dirty && countCache.data) return db.prepare('SELECT COUNT(*) as count FROM assets').get().count;
+  return db.prepare('SELECT COUNT(*) as count FROM assets').get().count;
+}
+
+function registerIpcHandlers(db, getMainWindow, app) {
+  const cacheDir = getThumbCacheDir(app);
+
   ipcMain.handle('browse-folder', async () => {
     const mainWindow = getMainWindow();
     const result = await dialog.showOpenDialog(mainWindow, {
@@ -28,9 +97,10 @@ function registerIpcHandlers(db, getMainWindow) {
     const info = insertLib.run(dirPath, folderName, ignoreRegex || '');
     const libraryId = info.lastInsertRowid;
 
-    const count = scanDirectory(db, dirPath, libraryId, ignoreRegex);
+    const count = await scanDirectory(db, dirPath, libraryId, ignoreRegex);
     const mainWindow = getMainWindow();
     setupWatcher(db, mainWindow, dirPath, libraryId, ignoreRegex);
+    invalidateCountCache();
 
     return { libraryId, path: dirPath, name: folderName, assetCount: count, ignore_regex: ignoreRegex || '' };
   });
@@ -45,10 +115,11 @@ function registerIpcHandlers(db, getMainWindow) {
     db.prepare('DELETE FROM asset_tags WHERE asset_id IN (SELECT id FROM assets WHERE library_id = ?)').run(libraryId);
     db.prepare('DELETE FROM assets WHERE library_id = ?').run(libraryId);
     db.prepare('DELETE FROM libraries WHERE id = ?').run(libraryId);
+    invalidateCountCache();
     return true;
   });
 
-  ipcMain.handle('rescan-library', (event, libraryId) => {
+  ipcMain.handle('rescan-library', async (event, libraryId) => {
     const lib = db.prepare('SELECT * FROM libraries WHERE id = ?').get(libraryId);
     if (!lib) return { error: 'Library not found' };
 
@@ -56,14 +127,15 @@ function registerIpcHandlers(db, getMainWindow) {
     db.prepare('DELETE FROM asset_tags WHERE asset_id IN (SELECT id FROM assets WHERE library_id = ?)').run(libraryId);
     db.prepare('DELETE FROM assets WHERE library_id = ?').run(libraryId);
 
-    const count = scanDirectory(db, lib.path, libraryId, lib.ignore_regex);
+    const count = await scanDirectory(db, lib.path, libraryId, lib.ignore_regex);
     const mainWindow = getMainWindow();
     setupWatcher(db, mainWindow, lib.path, libraryId, lib.ignore_regex);
+    invalidateCountCache();
 
     return { libraryId, assetCount: count };
   });
 
-  ipcMain.handle('rescan-all', () => {
+  ipcMain.handle('rescan-all', async () => {
     const libraries = db.prepare('SELECT * FROM libraries').all();
     const mainWindow = getMainWindow();
     let total = 0;
@@ -71,9 +143,10 @@ function registerIpcHandlers(db, getMainWindow) {
       db.prepare('DELETE FROM asset_collections WHERE asset_id IN (SELECT id FROM assets WHERE library_id = ?)').run(lib.id);
       db.prepare('DELETE FROM asset_tags WHERE asset_id IN (SELECT id FROM assets WHERE library_id = ?)').run(lib.id);
       db.prepare('DELETE FROM assets WHERE library_id = ?').run(lib.id);
-      total += scanDirectory(db, lib.path, lib.id, lib.ignore_regex);
+      total += await scanDirectory(db, lib.path, lib.id, lib.ignore_regex);
       setupWatcher(db, mainWindow, lib.path, lib.id, lib.ignore_regex);
     }
+    invalidateCountCache();
     return total;
   });
 
@@ -125,12 +198,14 @@ function registerIpcHandlers(db, getMainWindow) {
     }
 
     if (params.limit) {
+      const limit = Math.min(Math.max(parseInt(params.limit) || 50, 1), 1000);
       query += ' LIMIT ?';
-      values.push(params.limit);
+      values.push(limit);
     }
     if (params.offset) {
+      const offset = Math.max(parseInt(params.offset) || 0, 0);
       query += ' OFFSET ?';
-      values.push(params.offset);
+      values.push(offset);
     }
 
     return db.prepare(query).all(...values);
@@ -192,6 +267,7 @@ function registerIpcHandlers(db, getMainWindow) {
     const asset = db.prepare('SELECT is_favorite FROM assets WHERE id = ?').get(assetId);
     const newVal = asset.is_favorite ? 0 : 1;
     db.prepare('UPDATE assets SET is_favorite = ? WHERE id = ?').run(newVal, assetId);
+    invalidateCountCache();
     return newVal;
   });
 
@@ -262,14 +338,11 @@ function registerIpcHandlers(db, getMainWindow) {
   });
 
   ipcMain.handle('get-category-counts', () => {
-    const counts = {};
-    const rows = db.prepare('SELECT category, COUNT(*) as count FROM assets GROUP BY category').all();
-    rows.forEach(r => counts[r.category] = r.count);
-    return counts;
+    return getCachedCategoryCounts(db);
   });
 
   ipcMain.handle('get-total-assets', () => {
-    return db.prepare('SELECT COUNT(*) as count FROM assets').get().count;
+    return getCachedTotalAssets(db);
   });
 
   ipcMain.handle('open-external', (event, filePath) => {
@@ -286,6 +359,7 @@ function registerIpcHandlers(db, getMainWindow) {
 
       if (videoExts.includes(ext)) {
         const fileUrl = 'file:///' + filePath.replace(/\\/g, '/');
+        if (stat.size > 500 * 1024 * 1024) return { error: 'File too large' };
         return { type: 'video', data: fileUrl };
       }
 
@@ -325,39 +399,30 @@ function registerIpcHandlers(db, getMainWindow) {
 
   ipcMain.handle('get-thumbnail', (event, filePath) => {
     try {
-      const ext = path.extname(filePath).toLowerCase();
-      const imageExts = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.ico', '.tiff', '.tif'];
-      if (!imageExts.includes(ext)) return { type: 'none' };
-      const stat = fs.statSync(filePath);
-      if (stat.size > 5 * 1024 * 1024) return { type: 'none' };
-      const data = fs.readFileSync(filePath);
-      const mimeMap = {
-        '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-        '.gif': 'image/gif', '.bmp': 'image/bmp', '.webp': 'image/webp',
-        '.ico': 'image/x-icon', '.tiff': 'image/tiff', '.tif': 'image/tiff'
-      };
-      return { type: 'image', data: `data:${mimeMap[ext] || 'image/png'};base64,${data.toString('base64')}` };
+      const cached = getCachedThumbnail(filePath, cacheDir);
+      if (cached) return { type: 'image', data: cached };
+      const generated = generateThumbnail(filePath, cacheDir);
+      if (generated) return { type: 'image', data: generated };
+      return { type: 'none' };
     } catch (e) {
       return { type: 'none' };
     }
   });
 
-  ipcMain.handle('get-thumbnails-batch', (event, filePaths) => {
+  ipcMain.handle('get-thumbnails-batch', async (event, filePaths) => {
     const results = {};
     const imageExts = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.ico', '.tiff', '.tif'];
-    for (const filePath of filePaths) {
+    const batch = filePaths.slice(0, 50);
+    for (let i = 0; i < batch.length; i++) {
+      const filePath = batch[i];
+      if (i > 0 && i % 10 === 0) await new Promise(r => setImmediate(r));
       try {
         const ext = path.extname(filePath).toLowerCase();
         if (!imageExts.includes(ext)) continue;
-        const stat = fs.statSync(filePath);
-        if (stat.size > 5 * 1024 * 1024) continue;
-        const data = fs.readFileSync(filePath);
-        const mimeMap = {
-          '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-          '.gif': 'image/gif', '.bmp': 'image/bmp', '.webp': 'image/webp',
-          '.ico': 'image/x-icon', '.tiff': 'image/tiff', '.tif': 'image/tiff'
-        };
-        results[filePath] = `data:${mimeMap[ext] || 'image/png'};base64,${data.toString('base64')}`;
+        const cached = getCachedThumbnail(filePath, cacheDir);
+        if (cached) { results[filePath] = cached; continue; }
+        const generated = generateThumbnail(filePath, cacheDir);
+        if (generated) results[filePath] = generated;
       } catch (e) {}
     }
     return results;

@@ -2,16 +2,20 @@ const path = require('path');
 const fs = require('fs');
 const { ALL_EXTENSIONS, getAssetCategory } = require('./constants');
 
-function getAllFiles(dirPath, ignoreRegex) {
+async function getAllFiles(dirPath, ignoreRegex, signal) {
   const results = [];
   let ignorePattern = null;
   if (ignoreRegex && ignoreRegex.trim()) {
-    try { ignorePattern = new RegExp(ignoreRegex, 'i'); } catch (e) { ignorePattern = null; }
+    try {
+      if (ignoreRegex.length > 200) throw new Error('Regex too long');
+      ignorePattern = new RegExp(ignoreRegex, 'i');
+    } catch (e) { ignorePattern = null; }
   }
 
   try {
-    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
     for (const entry of entries) {
+      if (signal?.aborted) return results;
       const fullPath = path.join(dirPath, entry.name);
       const posixPath = fullPath.replace(/\\/g, '/');
 
@@ -23,7 +27,8 @@ function getAllFiles(dirPath, ignoreRegex) {
 
       if (entry.isDirectory()) {
         if (!entry.name.startsWith('.')) {
-          results.push(...getAllFiles(fullPath, ignoreRegex));
+          const sub = await getAllFiles(fullPath, ignoreRegex, signal);
+          results.push(...sub);
         }
       } else {
         const ext = path.extname(entry.name).toLowerCase();
@@ -36,13 +41,13 @@ function getAllFiles(dirPath, ignoreRegex) {
   return results;
 }
 
-function scanDirectory(db, dirPath, libraryId, ignoreRegex) {
+async function scanDirectory(db, dirPath, libraryId, ignoreRegex, signal) {
   const insertAsset = db.prepare(`
     INSERT OR REPLACE INTO assets (library_id, file_path, file_name, file_ext, file_size, modified_date, created_date, category)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
-  const files = getAllFiles(dirPath, ignoreRegex);
+  const files = await getAllFiles(dirPath, ignoreRegex, signal);
   const insertMany = db.transaction((fileList) => {
     for (const filePath of fileList) {
       try {

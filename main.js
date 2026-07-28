@@ -44,7 +44,7 @@ app.whenReady().then(() => {
   initDatabase();
   const db = getDb();
 
-  registerIpcHandlers(db, getMainWindow);
+  registerIpcHandlers(db, getMainWindow, app);
   createWindow();
 
   const libraries = db.prepare('SELECT * FROM libraries').all();

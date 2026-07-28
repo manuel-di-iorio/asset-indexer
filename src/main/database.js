@@ -12,6 +12,7 @@ function initDatabase() {
   const dbPath = path.join(app.getPath('userData'), 'assets.db');
   db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
+  db.pragma('synchronous = NORMAL');
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS libraries (
@@ -68,7 +69,34 @@ function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_assets_file_ext ON assets(file_ext);
     CREATE INDEX IF NOT EXISTS idx_assets_library ON assets(library_id);
     CREATE INDEX IF NOT EXISTS idx_assets_favorite ON assets(is_favorite);
+    CREATE INDEX IF NOT EXISTS idx_assets_name ON assets(file_name);
   `);
+
+  const ftsExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='assets_fts'").get();
+  if (!ftsExists) {
+    db.exec(`
+      CREATE VIRTUAL TABLE IF NOT EXISTS assets_fts USING fts5(
+        file_name,
+        content='assets',
+        content_rowid='id'
+      );
+
+      INSERT INTO assets_fts(rowid, file_name) SELECT id, file_name FROM assets;
+
+      CREATE TRIGGER IF NOT EXISTS assets_ai AFTER INSERT ON assets BEGIN
+        INSERT INTO assets_fts(rowid, file_name) VALUES (new.id, new.file_name);
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS assets_ad AFTER DELETE ON assets BEGIN
+        INSERT INTO assets_fts(assets_fts, rowid, file_name) VALUES('delete', old.id, old.file_name);
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS assets_au AFTER UPDATE ON assets BEGIN
+        INSERT INTO assets_fts(assets_fts, rowid, file_name) VALUES('delete', old.id, old.file_name);
+        INSERT INTO assets_fts(rowid, file_name) VALUES (new.id, new.file_name);
+      END;
+    `);
+  }
 
   const cols = db.prepare("PRAGMA table_info(libraries)").all();
   if (!cols.find(c => c.name === 'ignore_regex')) {
