@@ -9,7 +9,7 @@ Intelligent asset indexer for game developers. A desktop application to organize
 - **Library Management** -- Add local folders as libraries, configure per-library ignore patterns via regex, and rescan on demand
 - **Real-time File Watching** -- Automatic index updates when files are added, modified, or removed on disk
 - **7 Asset Categories** -- 3D models, images, materials, audio, scripts, videos, and documents
-- **Image Thumbnails** -- Direct file loading via custom protocol, no IPC overhead
+- **Image Thumbnails** -- Direct file loading via `file://` protocol
 - **Rich Previews** -- Images, audio with waveform visualization (Web Audio API), video playback, and code/text viewer
 - **Tag System** -- Create custom-colored tags, assign to assets, and filter by tag
 - **Collections** -- Group assets into named collections for project-based organization
@@ -17,7 +17,7 @@ Intelligent asset indexer for game developers. A desktop application to organize
 - **Search and Filter** -- By name, category, library, tag, or collection
 - **Sort Options** -- Name, size, modified date, or type
 - **Grid and List Views** -- Toggle between visual grid and compact list layouts
-- **Custom Frameless UI** -- Dark theme with purple accent, built with vanilla HTML/CSS/JS
+- **Custom Frameless UI** -- Dark theme with purple accent
 
 ## Supported Formats
 
@@ -39,6 +39,7 @@ Intelligent asset indexer for game developers. A desktop application to organize
 | Language | JavaScript |
 | Database | SQLite via better-sqlite3 |
 | File Watching | Chokidar 3.6 |
+| Build Tool | Vite + vite-plugin-electron |
 | Packaging | electron-builder (NSIS installer) |
 | UI | Vanilla HTML/CSS/JS, Inter font |
 
@@ -46,13 +47,46 @@ Intelligent asset indexer for game developers. A desktop application to organize
 
 ```
 AssetIndexer/
-  main.js              # Electron main process (database, IPC, file scanning, watchers)
-  preload.js           # Context bridge for secure IPC
-  package.json         # Dependencies and build configuration
-  renderer/
-    index.html         # Application markup (three-panel layout)
-    app.js             # Renderer logic (state, DOM, events, waveform)
-    styles.css         # Styling (dark theme, responsive breakpoints)
+  index.html              # Application markup (Vite entry)
+  main.js                 # Electron main process bootstrap
+  preload.js              # Context bridge for secure IPC
+  vite.config.js          # Vite configuration with Electron plugin
+  package.json            # Dependencies and build configuration
+
+  src/
+    main/                 # Main process (Node.js, CommonJS)
+      constants.js        # Asset extension definitions & helpers
+      database.js         # SQLite schema, init, migrations
+      scanner.js          # Recursive file scanning with ignore patterns
+      watchers.js         # Chokidar file watcher management
+      ipc-handlers.js     # All IPC handlers (25+ handlers)
+
+    renderer/             # Renderer process (ES modules, Vite)
+      main.js             # Entry point (DOMContentLoaded bootstrap)
+      state.js            # Global state object
+      constants.js        # Category labels, icons, colors
+      utils.js            # Formatting and DOM helpers
+      api.js              # Data loading wrappers around window.api
+      context-menu.js     # Right-click context menu
+      events.js           # Event listeners + custom event orchestration
+      styles.css          # Complete dark theme stylesheet
+
+      render/
+        asset-grid.js     # Asset card grid/list rendering
+        sidebar.js        # Sources, tags, collections sidebar
+        inspector.js      # Asset detail inspector panel
+        breadcrumb.js     # Breadcrumb path and sidebar active state
+        preview/
+          index.js        # Preview dispatcher (image/audio/video/code/text)
+          waveform.js     # Canvas waveform visualization
+
+      modals/
+        modal.js          # Generic modal show/hide
+        add-library.js    # Add library folder modal
+        add-tag.js        # Add tag modal
+        add-tag-to-asset.js
+        add-collection.js
+        add-to-collection.js
 ```
 
 ## Getting Started
@@ -73,26 +107,26 @@ npm install
 ### Development
 
 ```bash
-npm start
+npm run dev
 ```
 
-### Build
+Starts the Vite dev server with HMR and launches Electron.
 
-Package the application as a Windows installer:
+### Production Build
 
 ```bash
 npm run build
 ```
 
-The output will be available in the `dist/` directory.
+Vite builds the renderer and main process, then electron-builder packages a Windows NSIS installer in `dist/`.
 
 ## Architecture
 
 The application follows Electron's main/renderer process model with context isolation enabled (`contextIsolation: true`, `nodeIntegration: false`).
 
-**Main Process** (`main.js`) handles SQLite database operations (6 tables with indexes), recursive file scanning with regex-based ignore patterns, Chokidar file watchers per library, and 25+ IPC handlers.
+**Main Process** (`src/main/`) handles SQLite database operations (6 tables with indexes), recursive file scanning with regex-based ignore patterns, Chokidar file watchers per library, and 25+ IPC handlers. Organized as five modules: `database.js`, `scanner.js`, `watchers.js`, `ipc-handlers.js`, and `constants.js`.
 
-**Renderer Process** (`renderer/`) manages the UI state, DOM rendering, direct file loading via `file://` protocol for images/video previews, and canvas-based audio waveform visualization. Communication with the main process occurs exclusively through the preload bridge (`preload.js`).
+**Renderer Process** (`src/renderer/`) is built with Vite and uses ES modules. It manages UI state, DOM rendering, direct file loading via `file://` protocol for image/video previews, and canvas-based audio waveform visualization. Communication with the main process occurs exclusively through the preload bridge (`preload.js`).
 
 The SQLite database is stored at the Electron `userData` path (`assets.db`) and uses WAL mode for concurrent read/write performance.
 
