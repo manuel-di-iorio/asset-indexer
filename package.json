@@ -11,7 +11,7 @@
   "license": "MIT",
   "dependencies": {
     "better-sqlite3": "^11.0.0",
-    "chokidar": "^3.6.0"    
+    "chokidar": "^3.6.0"
   },
   "devDependencies": {
     "electron": "^30.0.0",
@@ -24,6 +24,7 @@
       "output": "dist"
     },
     "win": {
+      "icon": "renderer/icon.ico",
       "target": "nsis",
       "signAndEditExecutable": false,
       "verifyUpdateCodeSignature": false,

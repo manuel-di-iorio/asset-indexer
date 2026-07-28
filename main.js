@@ -241,7 +241,7 @@ function createWindow() {
       nodeIntegration: false,
       webSecurity: false
     },
-    icon: path.join(__dirname, 'renderer', 'icon.png')
+    icon: path.join(__dirname, 'renderer', 'icon.ico')
   });
 
   mainWindow.maximize();

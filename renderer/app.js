@@ -91,6 +91,10 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+function toFileUrl(filePath) {
+  return 'file:///' + filePath.replace(/\\/g, '/');
+}
+
 // Data loading
 async function loadLibraries() {
   state.libraries = await window.api.getLibraries();
@@ -144,8 +148,6 @@ async function loadAssets() {
 }
 
 // Rendering
-let thumbnailObserver = null;
-const thumbnailCache = new Map();
 
 function renderAssets() {
   const grid = document.getElementById('asset-grid');
@@ -166,13 +168,11 @@ function renderAssets() {
     const isSelected = state.selectedAsset && state.selectedAsset.id === asset.id;
     const isFav = asset.is_favorite;
     const isImage = ['images'].includes(category);
-    const cachedThumb = thumbnailCache.get(asset.file_path);
-
     return `
       <div class="asset-card ${isSelected ? 'selected' : ''}" data-id="${asset.id}" data-category="${category}" data-path="${escapeHtml(asset.file_path)}">
         <div class="card-thumbnail">
-          ${cachedThumb ? `<img class="card-thumb-img" src="${cachedThumb}" alt="">` : `<div class="thumb-placeholder" style="color: ${color}">${isImage ? '<span class="thumb-loading"></span>' : icon}</div>`}
-          ${isFav ? '<div class="fav-badge"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>' : ''}
+          ${isImage ? `<img class="card-thumb-img" src="${toFileUrl(asset.file_path)}" alt="" loading="lazy">` : `<div class="thumb-placeholder" style="color: ${color}">${icon}</div>`}
+          ${isFav ? '<div class="fav-badge"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 5.82 21.02 12 17.77 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>' : ''}
         </div>
         <div class="card-info">
           <div class="card-name">${escapeHtml(asset.file_name)}</div>
@@ -184,57 +184,6 @@ function renderAssets() {
 
   grid.querySelectorAll('.asset-card').forEach(card => {
     card.addEventListener('click', () => selectAsset(parseInt(card.dataset.id)));
-  });
-
-  loadVisibleThumbnails();
-}
-
-function loadVisibleThumbnails() {
-  if (thumbnailObserver) thumbnailObserver.disconnect();
-
-  thumbnailObserver = new IntersectionObserver((entries) => {
-    const toLoad = [];
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        const card = entry.target;
-        const filePath = card.dataset.path;
-        const category = card.dataset.category;
-        if (category === 'images' && filePath && !thumbnailCache.has(filePath)) {
-          toLoad.push({ filePath, card });
-        }
-        thumbnailObserver.unobserve(card);
-      }
-    });
-
-    if (toLoad.length > 0) {
-      const paths = toLoad.map(t => t.filePath);
-      window.api.getThumbnailsBatch(paths).then(results => {
-        Object.entries(results).forEach(([path, dataUrl]) => {
-          thumbnailCache.set(path, dataUrl);
-        });
-        toLoad.forEach(({ filePath, card }) => {
-          const dataUrl = thumbnailCache.get(filePath);
-          const placeholder = card.querySelector('.thumb-placeholder');
-          if (!placeholder) return;
-          if (dataUrl) {
-            placeholder.outerHTML = `<img class="card-thumb-img" src="${dataUrl}" alt="">`;
-          } else {
-            const category = card.dataset.category;
-            const color = CATEGORY_COLORS[category] || CATEGORY_COLORS['other'];
-            const icon = CATEGORY_ICONS[category] || CATEGORY_ICONS['other'];
-            placeholder.innerHTML = icon;
-            placeholder.style.color = color;
-          }
-        });
-      });
-    }
-  }, { rootMargin: '100px' });
-
-  document.querySelectorAll('.asset-card[data-category="images"]').forEach(card => {
-    const filePath = card.dataset.path;
-    if (filePath && !thumbnailCache.has(filePath)) {
-      thumbnailObserver.observe(card);
-    }
   });
 }
 
@@ -480,7 +429,7 @@ async function loadPreview(asset) {
   }
 
   if (result.type === 'image') {
-    previewEl.innerHTML = `<img class="preview-image" src="${result.data}" alt="${escapeHtml(asset.file_name)}">`;
+    previewEl.innerHTML = `<img class="preview-image" src="${toFileUrl(asset.file_path)}" alt="${escapeHtml(asset.file_name)}">`;
   } else if (result.type === 'audio') {
     const audioId = 'audio-' + Date.now();
     currentWaveform = null;
