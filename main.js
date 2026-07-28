@@ -21,7 +21,9 @@ function createWindow() {
       nodeIntegration: false,
       webSecurity: false
     },
-    icon: path.join(__dirname, 'src', 'renderer', 'icon.ico')
+    icon: app.isPackaged
+      ? path.join(__dirname, '..', 'src', 'renderer', 'icon.ico')
+      : path.join(__dirname, 'src', 'renderer', 'icon.ico')
   });
 
   mainWindow.maximize();
@@ -30,7 +32,7 @@ function createWindow() {
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
   } else {
-    mainWindow.loadFile(path.join(__dirname, 'dist', 'index.html'));
+    mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   }
 }
 

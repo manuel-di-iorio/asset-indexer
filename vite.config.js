@@ -6,6 +6,13 @@ export default defineConfig({
     electron([
       {
         entry: 'main.js',
+        vite: {
+          build: {
+            rollupOptions: {
+              external: ['better-sqlite3', 'chokidar'],
+            },
+          },
+        },
       },
       {
         entry: 'preload.js',

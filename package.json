@@ -2,7 +2,7 @@
   "name": "asset-indexer",
   "version": "1.0.0",
   "description": "Intelligent asset indexer for game developers",
-  "main": "main.js",
+  "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
     "start": "vite",
@@ -25,12 +25,17 @@
   "build": {
     "appId": "com.assetindexer.app",
     "productName": "Asset Indexer",
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "src/renderer/icon.ico"
+    ],
     "directories": {
       "output": "dist"
     },
     "win": {
-      "icon": "renderer/icon.ico",
-      "target": "nsis",
+      "icon": "src/renderer/icon.ico",
+      "target": ["nsis", "portable"],
       "signAndEditExecutable": false,
       "verifyUpdateCodeSignature": false,
       "forceCodeSigning": false
