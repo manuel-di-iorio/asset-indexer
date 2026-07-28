@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: file:; media-src 'self' data: file:;">
+  <title>Asset Indexer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app">
+    <!-- Title Bar -->
+    <div class="titlebar" id="titlebar">
+      <div class="titlebar-drag">
+        <div class="titlebar-logo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="url(#grad1)" opacity="0.9"/>
+            <path d="M2 17L12 22L22 17" stroke="url(#grad2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 12L12 17L22 12" stroke="url(#grad2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <defs>
+              <linearGradient id="grad1" x1="2" y1="2" x2="22" y2="12">
+                <stop stop-color="#a855f7"/>
+                <stop offset="1" stop-color="#6366f1"/>
+              </linearGradient>
+              <linearGradient id="grad2" x1="2" y1="12" x2="22" y2="22">
+                <stop stop-color="#a855f7"/>
+                <stop offset="1" stop-color="#6366f1"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <span class="titlebar-title">Asset Indexer</span>
+        </div>
+        <div class="titlebar-actions">
+          <button class="scan-btn" id="btn-rescan-all" title="Rescan All Libraries">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+            Scan All
+          </button>
+        </div>
+      </div>
+      <div class="titlebar-controls">
+        <button class="control-btn" id="btn-minimize">
+          <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 6h8" stroke="currentColor" stroke-width="1.5"/></svg>
+        </button>
+        <button class="control-btn" id="btn-maximize">
+          <svg width="12" height="12" viewBox="0 0 12 12"><rect x="2" y="2" width="8" height="8" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+        </button>
+        <button class="control-btn close" id="btn-close">
+          <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="main-layout">
+      <!-- Left Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-section">
+          <div class="sidebar-section-header">
+            <span>LIBRARY</span>
+          </div>
+          <div class="sidebar-items" id="library-list">
+            <div class="sidebar-item" data-category="all">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
+              <span class="item-name">All Assets</span>
+              <span class="item-count" id="count-all">0</span>
+            </div>
+            <div class="sidebar-item" data-category="favorites">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              <span class="item-name">Favorites</span>
+              <span class="item-count" id="count-favorites">0</span>
+            </div>
+            <div class="sidebar-item" data-category="images">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              <span class="item-name">Images</span>
+              <span class="item-count" id="count-images">0</span>
+            </div>
+            <div class="sidebar-item" data-category="audio">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+              <span class="item-name">Audio</span>
+              <span class="item-count" id="count-audio">0</span>
+            </div>
+            <div class="sidebar-item" data-category="scripts">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+              <span class="item-name">Scripts</span>
+              <span class="item-count" id="count-scripts">0</span>
+            </div>
+            <div class="sidebar-item" data-category="materials">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>
+              <span class="item-name">Materials</span>
+              <span class="item-count" id="count-materials">0</span>
+            </div>
+            <div class="sidebar-item" data-category="3d-models">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+              <span class="item-name">3D Models</span>
+              <span class="item-count" id="count-3d-models">0</span>
+            </div>
+            <div class="sidebar-item" data-category="videos">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+              <span class="item-name">Videos</span>
+              <span class="item-count" id="count-videos">0</span>
+            </div>
+            <div class="sidebar-item" data-category="documents">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              <span class="item-name">Documents</span>
+              <span class="item-count" id="count-documents">0</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="sidebar-section-header">
+            <span>COLLECTIONS</span>
+            <button class="sidebar-add-btn" id="btn-add-collection" title="Add Collection">+</button>
+          </div>
+          <div class="sidebar-items" id="collections-list"></div>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="sidebar-section-header">
+            <span>TAGS</span>
+            <button class="sidebar-add-btn" id="btn-add-tag" title="Add Tag">+</button>
+          </div>
+          <div class="sidebar-items" id="tags-list"></div>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="sidebar-section-header">
+            <span>SOURCES</span>
+          </div>
+          <div class="sidebar-items" id="sources-list"></div>
+        </div>
+
+        <div class="sidebar-footer">
+          <button class="add-library-btn" id="btn-add-library">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Library Folder
+          </button>
+        </div>
+      </aside>
+
+      <!-- Center Content -->
+      <main class="content" id="content">
+        <div class="toolbar">
+          <div class="breadcrumb-path" id="breadcrumb-path">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+            <span id="breadcrumb-text">All Assets</span>
+          </div>
+          <div class="toolbar-search">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="text" class="search-input" id="search-input" placeholder="Search assets...">
+          </div>
+          <div class="toolbar-right">
+            <div class="sort-control">
+              <span class="sort-label">Sort:</span>
+              <select class="filter-select" id="sort-select">
+                <option value="name">Name</option>
+                <option value="size">Size</option>
+                <option value="modified">Modified</option>
+                <option value="type">Type</option>
+              </select>
+            </div>
+            <div class="view-toggle">
+              <button class="view-btn active" id="btn-grid-view" title="Grid View">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+              </button>
+              <button class="view-btn" id="btn-list-view" title="List View">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="content-info" id="content-info">
+          <span id="asset-count-label">0 assets</span>
+        </div>
+
+        <div class="asset-grid" id="asset-grid"></div>
+
+        <div class="empty-state" id="empty-state" style="display:none;">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3">
+            <path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
+            <path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/>
+          </svg>
+          <h3>No assets found</h3>
+          <p>Add a library folder to start indexing your assets</p>
+          <button class="primary-btn" id="btn-empty-add-library">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Library Folder
+          </button>
+        </div>
+      </main>
+
+      <!-- Right Inspector Panel -->
+      <aside class="inspector" id="inspector">
+        <div class="inspector-empty" id="inspector-empty">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <polyline points="21 15 16 10 5 21"/>
+          </svg>
+          <p>Select an asset to view details</p>
+        </div>
+
+        <div class="inspector-content" id="inspector-content" style="display:none;">
+          <div class="inspector-header">
+            <div class="inspector-title-row">
+              <h3 class="inspector-title" id="inspector-title">Asset Name</h3>
+              <button class="inspector-fav-btn" id="inspector-fav-btn" title="Toggle Favorite">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="inspector-preview" id="inspector-preview">
+            <div class="preview-placeholder">
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+            </div>
+          </div>
+
+          <div class="inspector-details" id="inspector-details"></div>
+
+          <div class="inspector-tags">
+            <div class="inspector-tags-header">
+              <span>TAGS</span>
+              <button class="sidebar-add-btn" id="btn-add-tag-to-asset">+</button>
+            </div>
+            <div class="tag-chips" id="inspector-tag-chips"></div>
+          </div>
+
+          <div class="inspector-collections" id="inspector-collections">
+            <div class="inspector-tags-header">
+              <span>COLLECTIONS</span>
+              <button class="sidebar-add-btn" id="btn-add-to-collection">+</button>
+            </div>
+            <div class="tag-chips" id="inspector-collection-chips"></div>
+          </div>
+
+          <div class="inspector-actions">
+            <button class="secondary-btn" id="btn-open-external">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              Open in File Explorer
+            </button>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="statusbar" id="statusbar">
+      <div class="statusbar-left">
+        <span id="status-selected">0 selected</span>
+        <span class="statusbar-separator">|</span>
+        <span id="status-total">0 assets indexed</span>
+        <span class="statusbar-separator">|</span>
+        <span id="status-libraries">0 libraries</span>
+      </div>
+      <div class="statusbar-right">
+        <span>v1.0.0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Context Menu -->
+  <div class="context-menu" id="context-menu" style="display:none;"></div>
+
+  <!-- Modals -->
+  <div class="modal-overlay" id="modal-overlay" style="display:none;">
+    <div class="modal" id="modal">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modal-title">Add Tag</h3>
+        <button class="modal-close" id="modal-close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-footer" id="modal-footer"></div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/renderer/main.js"></script>
+</body>
+</html>
