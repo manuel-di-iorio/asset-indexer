@@ -52,6 +52,7 @@ let state = {
 
 let searchTimeout = null;
 let contextMenuTarget = null;
+let contextMenuType = null;
 
 function formatFileSize(bytes) {
   if (!bytes || bytes === 0) return '0 B';
@@ -206,6 +207,14 @@ function renderTags() {
       renderTags();
       updateBreadcrumb();
     });
+    item.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      contextMenuTarget = parseInt(item.dataset.tagId);
+      contextMenuType = 'tag';
+      showContextMenu(e.clientX, e.clientY, [
+        { label: 'Delete Tag', icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>', action: 'delete', danger: true }
+      ]);
+    });
   });
 }
 
@@ -227,6 +236,14 @@ function renderCollections() {
       loadAssets();
       renderCollections();
       updateBreadcrumb();
+    });
+    item.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      contextMenuTarget = parseInt(item.dataset.collectionId);
+      contextMenuType = 'collection';
+      showContextMenu(e.clientX, e.clientY, [
+        { label: 'Delete Collection', icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>', action: 'delete', danger: true }
+      ]);
     });
   });
 }
@@ -266,26 +283,78 @@ function renderSources() {
     item.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       contextMenuTarget = parseInt(item.dataset.libraryId);
-      showContextMenu(e.clientX, e.clientY);
+      contextMenuType = 'source';
+      showContextMenu(e.clientX, e.clientY, [
+        { label: 'Rescan', icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>', action: 'rescan' },
+        { type: 'separator' },
+        { label: 'Remove Source', icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>', action: 'remove', danger: true }
+      ]);
     });
   });
 }
 
-function showContextMenu(x, y) {
+function showContextMenu(x, y, items) {
   const menu = document.getElementById('context-menu');
+  menu.innerHTML = items.map((item, i) => {
+    if (item.type === 'separator') return '<div class="context-menu-separator"></div>';
+    return `<div class="context-menu-item${item.danger ? ' danger' : ''}" data-action="${item.action}">${item.icon || ''}${escapeHtml(item.label)}</div>`;
+  }).join('');
+
+  menu.querySelectorAll('.context-menu-item').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleContextAction(el.dataset.action);
+    });
+  });
+
   menu.style.display = 'block';
   menu.style.left = x + 'px';
   menu.style.top = y + 'px';
 
-  // Adjust if off screen
   const rect = menu.getBoundingClientRect();
   if (rect.right > window.innerWidth) menu.style.left = (x - rect.width) + 'px';
   if (rect.bottom > window.innerHeight) menu.style.top = (y - rect.height) + 'px';
 }
 
+async function handleContextAction(action) {
+  if (action === 'rescan' && contextMenuType === 'source') {
+    await window.api.rescanLibrary(contextMenuTarget);
+    await loadLibraries();
+    await loadCategoryCounts();
+    await loadAssets();
+  } else if (action === 'remove' && contextMenuType === 'source') {
+    if (confirm('Remove this source and all its indexed assets?')) {
+      await window.api.removeLibrary(contextMenuTarget);
+      state.libraryIds = state.libraryIds.filter(id => id !== contextMenuTarget);
+      await loadLibraries();
+      await loadCategoryCounts();
+      await loadAssets();
+      updateBreadcrumb();
+    }
+  } else if (action === 'delete' && contextMenuType === 'tag') {
+    if (confirm('Delete this tag from all assets?')) {
+      await window.api.deleteTag(contextMenuTarget);
+      if (state.tagId === contextMenuTarget) state.tagId = null;
+      await loadTags();
+      await loadAssets();
+      updateBreadcrumb();
+    }
+  } else if (action === 'delete' && contextMenuType === 'collection') {
+    if (confirm('Delete this collection?')) {
+      await window.api.deleteCollection(contextMenuTarget);
+      if (state.collectionId === contextMenuTarget) state.collectionId = null;
+      await loadCollections();
+      await loadAssets();
+      updateBreadcrumb();
+    }
+  }
+  hideContextMenu();
+}
+
 function hideContextMenu() {
   document.getElementById('context-menu').style.display = 'none';
   contextMenuTarget = null;
+  contextMenuType = null;
 }
 
 async function selectAsset(assetId) {
@@ -380,8 +449,9 @@ function renderAssetTags(asset) {
       const tagId = parseInt(btn.dataset.tagId);
       if (tagId && state.selectedAsset) {
         await window.api.removeTagFromAsset(state.selectedAsset.id, tagId);
-        selectAsset(state.selectedAsset.id);
-        loadTags();
+        await selectAsset(state.selectedAsset.id);
+        await loadTags();
+        await loadAssets();
       }
     });
   });
@@ -389,24 +459,32 @@ function renderAssetTags(asset) {
 
 function renderAssetCollections(asset) {
   const container = document.getElementById('inspector-collection-chips');
-  if (state.collections.length === 0) {
+  const collectionNames = asset.collections ? asset.collections.split(',') : [];
+
+  container.innerHTML = collectionNames.map(name => {
+    const col = state.collections.find(c => c.name === name);
+    return `
+      <div class="tag-chip" style="border-color: var(--accent)40">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+        ${escapeHtml(name)}
+        <button class="tag-remove" data-collection-id="${col ? col.id : ''}" title="Remove from collection">&times;</button>
+      </div>
+    `;
+  }).join('');
+
+  if (collectionNames.length === 0) {
     container.innerHTML = '<span style="font-size:11px; color:var(--text-muted)">No collections</span>';
-    return;
   }
 
-  container.innerHTML = state.collections.map(col => `
-    <div class="tag-chip" style="cursor:pointer" data-collection-id="${col.id}">
-      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-      ${escapeHtml(col.name)}
-    </div>
-  `).join('');
-
-  container.querySelectorAll('.tag-chip').forEach(chip => {
-    chip.addEventListener('click', async () => {
-      const colId = parseInt(chip.dataset.collectionId);
-      if (state.selectedAsset) {
-        await window.api.addAssetToCollection(state.selectedAsset.id, colId);
+  container.querySelectorAll('.tag-remove').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const colId = parseInt(btn.dataset.collectionId);
+      if (colId && state.selectedAsset) {
+        await window.api.removeAssetFromCollection(state.selectedAsset.id, colId);
+        await selectAsset(state.selectedAsset.id);
         await loadCollections();
+        await loadAssets();
       }
     });
   });
@@ -656,26 +734,6 @@ function initEventListeners() {
 
   // Context menu
   document.addEventListener('click', hideContextMenu);
-  document.getElementById('ctx-rescan').addEventListener('click', async () => {
-    if (contextMenuTarget) {
-      await window.api.rescanLibrary(contextMenuTarget);
-      await loadLibraries();
-      await loadCategoryCounts();
-      await loadAssets();
-    }
-    hideContextMenu();
-  });
-  document.getElementById('ctx-remove').addEventListener('click', async () => {
-    if (contextMenuTarget && confirm('Remove this source and all its indexed assets?')) {
-      await window.api.removeLibrary(contextMenuTarget);
-      state.libraryIds = state.libraryIds.filter(id => id !== contextMenuTarget);
-      await loadLibraries();
-      await loadCategoryCounts();
-      await loadAssets();
-      updateBreadcrumb();
-    }
-    hideContextMenu();
-  });
 
   document.getElementById('btn-rescan-all').addEventListener('click', async () => {
     const btn = document.getElementById('btn-rescan-all');
@@ -867,6 +925,7 @@ function initEventListeners() {
         if (colId) {
           await window.api.addAssetToCollection(state.selectedAsset.id, colId);
           await loadCollections();
+          await selectAsset(state.selectedAsset.id);
           hideModal();
         }
       });
@@ -877,6 +936,7 @@ function initEventListeners() {
           if (result && result.id) {
             await window.api.addAssetToCollection(state.selectedAsset.id, result.id);
             await loadCollections();
+            await selectAsset(state.selectedAsset.id);
             hideModal();
           }
         }

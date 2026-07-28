@@ -749,6 +749,10 @@ html, body {
   color: var(--yellow);
 }
 
+.inspector-fav-btn.active svg {
+  fill: var(--yellow);
+}
+
 .inspector-preview {
   padding: 16px;
   border-bottom: 1px solid var(--border-color);

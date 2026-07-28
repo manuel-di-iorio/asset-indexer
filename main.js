@@ -430,10 +430,15 @@ ipcMain.handle('get-asset-count', (event, params) => {
 
 ipcMain.handle('get-asset', (event, assetId) => {
   return db.prepare(`
-    SELECT a.*, GROUP_CONCAT(t.name) as tags, GROUP_CONCAT(t.color) as tag_colors
+    SELECT a.*,
+      GROUP_CONCAT(DISTINCT t.name) as tags,
+      GROUP_CONCAT(DISTINCT t.color) as tag_colors,
+      GROUP_CONCAT(DISTINCT c.name) as collections
     FROM assets a
     LEFT JOIN asset_tags at ON a.id = at.asset_id
     LEFT JOIN tags t ON at.tag_id = t.id
+    LEFT JOIN asset_collections ac ON a.id = ac.asset_id
+    LEFT JOIN collections c ON ac.collection_id = c.id
     WHERE a.id = ?
     GROUP BY a.id
   `).get(assetId);
