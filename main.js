@@ -11,7 +11,7 @@ let watchers = {};
 const ASSET_EXTENSIONS = {
   '3d-models': ['.fbx', '.obj', '.gltf', '.glb', '.blend', '.3ds', '.dae', '.stl', '.ply'],
   'images': ['.png', '.jpg', '.jpeg', '.tga', '.tiff', '.tif', '.bmp', '.gif', '.psd', '.hdr', '.exr', '.dds', '.ktx', '.webp', '.ico'],
-  'materials': ['.mat', '.material', '.shader'],
+  'materials': ['.mat', '.material', '.shader', '.mtl'],
   'audio': ['.wav', '.mp3', '.ogg', '.flac', '.aiff', '.m4a', '.wma'],
   'scripts': ['.cs', '.js', '.ts', '.py', '.lua', '.cpp', '.h'],
   'videos': ['.mp4', '.avi', '.mov', '.wmv', '.mkv', '.webm'],
@@ -238,7 +238,8 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      webSecurity: false
     },
     icon: path.join(__dirname, 'renderer', 'icon.png')
   });
@@ -529,11 +530,17 @@ ipcMain.handle('open-external', (event, filePath) => {
 ipcMain.handle('get-file-content', async (event, filePath) => {
   try {
     const stat = fs.statSync(filePath);
-    if (stat.size > 5 * 1024 * 1024) return { error: 'File too large' };
     const ext = path.extname(filePath).toLowerCase();
     const imageExts = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.ico', '.tiff', '.tif'];
     const audioExts = ['.wav', '.mp3', '.ogg', '.flac', '.aiff', '.aif', '.m4a', '.wma'];
-    const videoExts = ['.mp4', '.webm'];
+    const videoExts = ['.mp4', '.webm', '.avi', '.mov', '.mkv', '.wmv'];
+
+    if (videoExts.includes(ext)) {
+      const fileUrl = 'file:///' + filePath.replace(/\\/g, '/');
+      return { type: 'video', data: fileUrl };
+    }
+
+    if (stat.size > 5 * 1024 * 1024) return { error: 'File too large' };
 
     if (imageExts.includes(ext)) {
       const data = fs.readFileSync(filePath);
@@ -552,11 +559,6 @@ ipcMain.handle('get-file-content', async (event, filePath) => {
         '.m4a': 'audio/mp4', '.wma': 'audio/x-ms-wma'
       };
       return { type: 'audio', data: `data:${mimeMap[ext] || 'audio/wav'};base64,${data.toString('base64')}` };
-    }
-    if (videoExts.includes(ext)) {
-      const data = fs.readFileSync(filePath);
-      const mimeMap = { '.mp4': 'video/mp4', '.webm': 'video/webm' };
-      return { type: 'video', data: `data:${mimeMap[ext] || 'video/mp4'};base64,${data.toString('base64')}` };
     }
     if (ext === '.txt' || ext === '.md' || ext === '.json' || ext === '.xml' || ext === '.csv' || ext === '.log') {
       const content = fs.readFileSync(filePath, 'utf-8');
@@ -578,7 +580,7 @@ ipcMain.handle('get-thumbnail', (event, filePath) => {
     const imageExts = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.ico', '.tiff', '.tif'];
     if (!imageExts.includes(ext)) return { type: 'none' };
     const stat = fs.statSync(filePath);
-    if (stat.size > 10 * 1024 * 1024) return { type: 'none' };
+    if (stat.size > 5 * 1024 * 1024) return { type: 'none' };
     const data = fs.readFileSync(filePath);
     const mimeMap = {
       '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',

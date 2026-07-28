@@ -515,9 +515,14 @@ html, body {
   border-radius: var(--radius-lg);
   overflow: hidden;
   cursor: pointer;
-  transition: all 200ms ease;
+  transition: border-color 200ms ease, background 200ms ease, box-shadow 200ms ease, transform 200ms ease;
   position: relative;
-  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+}
+
+.asset-grid:not(.list-view) .asset-card {
+  min-height: 200px;
 }
 
 .asset-card:hover {
@@ -547,6 +552,7 @@ html, body {
   display: flex;
   flex-direction: row;
   min-height: 48px;
+  max-height: 48px;
 }
 
 .asset-grid.list-view .asset-card .card-thumbnail {
@@ -1414,7 +1420,8 @@ html, body {
   width: 100%;
   border-radius: var(--radius-md);
   background: #000;
-  max-height: 200px;
+  max-height: 300px;
+  object-fit: contain;
 }
 
 .preview-code {

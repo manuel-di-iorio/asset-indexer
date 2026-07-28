@@ -214,11 +214,16 @@ function loadVisibleThumbnails() {
         });
         toLoad.forEach(({ filePath, card }) => {
           const dataUrl = thumbnailCache.get(filePath);
+          const placeholder = card.querySelector('.thumb-placeholder');
+          if (!placeholder) return;
           if (dataUrl) {
-            const placeholder = card.querySelector('.thumb-placeholder');
-            if (placeholder) {
-              placeholder.outerHTML = `<img class="card-thumb-img" src="${dataUrl}" alt="">`;
-            }
+            placeholder.outerHTML = `<img class="card-thumb-img" src="${dataUrl}" alt="">`;
+          } else {
+            const category = card.dataset.category;
+            const color = CATEGORY_COLORS[category] || CATEGORY_COLORS['other'];
+            const icon = CATEGORY_ICONS[category] || CATEGORY_ICONS['other'];
+            placeholder.innerHTML = icon;
+            placeholder.style.color = color;
           }
         });
       });
