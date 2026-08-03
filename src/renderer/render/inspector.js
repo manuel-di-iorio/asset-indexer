@@ -30,7 +30,10 @@ export async function selectAsset(assetId) {
   renderAssetDetails(asset);
   renderAssetTags(asset);
   renderAssetCollections(asset);
-  loadPreview(asset);
+  const previewResult = await loadPreview(asset);
+  if (previewResult?.width && previewResult?.height) {
+    renderImageDimensions(previewResult.width, previewResult.height);
+  }
 
   document.querySelectorAll('.asset-card').forEach(card => {
     card.classList.toggle('selected', parseInt(card.dataset.id) === assetId);
@@ -66,6 +69,11 @@ export function renderAssetDetails(asset) {
   }
 
   container.innerHTML = details;
+}
+
+function renderImageDimensions(width, height) {
+  const container = document.getElementById('inspector-details');
+  container.innerHTML += detailRow('Dimensions', `${width}×${height}px`);
 }
 
 export function renderAssetTags(asset) {

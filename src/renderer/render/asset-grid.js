@@ -5,6 +5,7 @@ import { CATEGORY_ICONS, CATEGORY_COLORS, CATEGORY_LABELS } from '../constants.j
 let thumbObserver = null;
 let thumbnailCache = {};
 let currentRenderId = 0;
+let thumbScrollHandler = null;
 
 function placeholderHTML(color, icon) {
   return `<div class="thumb-placeholder" style="color: ${color}">${icon}</div>`;
@@ -86,10 +87,15 @@ function setupThumbnailObserver() {
   if (thumbObserver) thumbObserver.disconnect();
   const grid = document.getElementById('asset-grid');
   if (!grid) return;
-  thumbObserver = new IntersectionObserver(() => {
-    loadThumbnailsForVisible();
-  }, { rootMargin: '300px' });
-  thumbObserver.observe(grid);
+  if (thumbScrollHandler) grid.removeEventListener('scroll', thumbScrollHandler);
+  thumbObserver = new IntersectionObserver((entries) => {
+    if (entries.some(e => e.isIntersecting)) loadThumbnailsForVisible();
+  }, { root: grid, rootMargin: '300px' });
+  grid.querySelectorAll('.card-thumbnail[data-thumb-path]').forEach(el => {
+    thumbObserver.observe(el);
+  });
+  thumbScrollHandler = () => loadThumbnailsForVisible();
+  grid.addEventListener('scroll', thumbScrollHandler, { passive: true });
 }
 
 export function renderAssets() {

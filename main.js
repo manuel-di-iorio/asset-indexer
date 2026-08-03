@@ -1,7 +1,7 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const { initDatabase, getDb } = require('./src/main/database');
-const { registerIpcHandlers } = require('./src/main/ipc-handlers');
+const { registerIpcHandlers, clearThumbnailCache } = require('./src/main/ipc-handlers');
 const { setupWatcher, stopAllWatchers } = require('./src/main/watchers');
 
 let mainWindow;
@@ -44,6 +44,7 @@ app.whenReady().then(() => {
   initDatabase();
   const db = getDb();
 
+  clearThumbnailCache(app);
   registerIpcHandlers(db, getMainWindow, app);
   createWindow();
 

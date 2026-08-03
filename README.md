@@ -93,7 +93,7 @@ AssetIndexer/
 
 ### Prerequisites
 
-- Node.js (v18 or later recommended)
+- Node.js (v22 or later recommended)
 - npm
 
 ### Installation

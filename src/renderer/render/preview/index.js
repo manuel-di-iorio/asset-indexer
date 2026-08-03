@@ -15,7 +15,7 @@ export async function loadPreview(asset) {
   const result = await window.api.getFileContent(asset.file_path);
   if (result.error || result.type === 'binary') {
     previewEl.innerHTML = `<div class="preview-placeholder" style="color: ${color}">${icon}</div>`;
-    return;
+    return null;
   }
 
   if (result.type === 'image') {
@@ -63,4 +63,6 @@ export async function loadPreview(asset) {
   } else if (result.type === 'text') {
     previewEl.innerHTML = `<pre class="preview-text">${escapeHtml(result.data)}</pre>`;
   }
+
+  return result;
 }

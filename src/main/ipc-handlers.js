@@ -33,20 +33,51 @@ function getCachedThumbnail(filePath, cacheDir) {
   return null;
 }
 
+function toFileUrl(filePath) {
+  return 'file:///' + filePath.replace(/\\/g, '/');
+}
+
 function generateThumbnail(filePath, cacheDir) {
   try {
     const stat = fs.statSync(filePath);
     if (stat.size > 10 * 1024 * 1024) return null;
 
+    const ext = path.extname(filePath).toLowerCase();
     const img = nativeImage.createFromPath(filePath);
     if (img.isEmpty()) return null;
 
-    const resized = img.resize({ width: 200, quality: 'good' });
-    const jpegBuf = resized.toJPEG(80);
+    const size = img.getSize();
+
+    if (ext === '.ico') {
+      const data = fs.readFileSync(filePath);
+      if (data.length >= 6) {
+        const count = data.readUInt16LE(4);
+        let best = null;
+        for (let i = 0; i < count; i++) {
+          const off = 6 + i * 16;
+          if (off + 16 > data.length) break;
+          const w = data[off] || 256;
+          const h = data[off + 1] || 256;
+          if (!best || w < best.w) best = { w, h };
+        }
+        if (best) {
+          const target = best.w < size.width ? img.resize({ width: best.w }) : img;
+          const pngBuf = target.toPNG();
+          const thumbPath = getThumbCachePath(filePath, cacheDir);
+          fs.writeFileSync(thumbPath, pngBuf);
+          return `data:image/png;base64,${pngBuf.toString('base64')}`;
+        }
+      }
+    }
+
+    if (size.width <= 200 && size.height <= 200) return toFileUrl(filePath);
+
+    const pngBuf = img.resize({ width: 200, quality: 'good' }).toPNG();
     const thumbPath = getThumbCachePath(filePath, cacheDir);
-    fs.writeFileSync(thumbPath, jpegBuf);
-    return `data:image/jpeg;base64,${jpegBuf.toString('base64')}`;
+    fs.writeFileSync(thumbPath, pngBuf);
+    return `data:image/png;base64,${pngBuf.toString('base64')}`;
   } catch (e) {
+    console.warn('Thumbnail generation failed for', filePath, e.message);
     return null;
   }
 }
@@ -372,7 +403,23 @@ function registerIpcHandlers(db, getMainWindow, app) {
           '.gif': 'image/gif', '.bmp': 'image/bmp', '.webp': 'image/webp',
           '.ico': 'image/x-icon', '.tiff': 'image/tiff', '.tif': 'image/tiff'
         };
-        return { type: 'image', data: `data:${mimeMap[ext] || 'image/png'};base64,${data.toString('base64')}` };
+        let width, height;
+        if (ext === '.ico' && data.length >= 6) {
+          const count = data.readUInt16LE(4);
+          let best = null;
+          for (let i = 0; i < count; i++) {
+            const off = 6 + i * 16;
+            if (off + 16 > data.length) break;
+            const w = data[off] || 256;
+            const h = data[off + 1] || 256;
+            if (!best || w < best.w) best = { w, h };
+          }
+          if (best) { width = best.w; height = best.h; }
+        } else {
+          const img = nativeImage.createFromPath(filePath);
+          if (!img.isEmpty()) { const s = img.getSize(); width = s.width; height = s.height; }
+        }
+        return { type: 'image', data: `data:${mimeMap[ext] || 'image/png'};base64,${data.toString('base64')}`, width, height };
       }
       if (audioExts.includes(ext)) {
         const data = fs.readFileSync(filePath);
@@ -439,4 +486,12 @@ function registerIpcHandlers(db, getMainWindow, app) {
   ipcMain.handle('window-close', () => getMainWindow()?.close());
 }
 
-module.exports = { registerIpcHandlers };
+function clearThumbnailCache(app) {
+  const dir = path.join(app.getPath('userData'), 'thumbnails');
+  if (!fs.existsSync(dir)) return;
+  for (const file of fs.readdirSync(dir)) {
+    fs.unlinkSync(path.join(dir, file));
+  }
+}
+
+module.exports = { registerIpcHandlers, clearThumbnailCache };
