@@ -44,5 +44,5 @@ export async function loadAssets() {
   state.assets = await window.api.getAssets(params);
   state.totalCount = await window.api.getAssetCount(params);
   document.getElementById('asset-count-label').textContent = `${state.totalCount.toLocaleString()} assets`;
-  document.getElementById('status-selected').textContent = state.selectedAsset ? '1 selected' : '0 selected';
+  document.getElementById('status-selected').textContent = state.selectedAssetIds.length ? `${state.selectedAssetIds.length} selected` : '0 selected';
 }

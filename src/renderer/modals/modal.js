@@ -13,3 +13,9 @@ export function showModal(title, bodyHtml, footerHtml) {
 export function hideModal() {
   document.getElementById('modal-overlay').style.display = 'none';
 }
+
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const overlay = document.getElementById('modal-overlay');
+  if (overlay && overlay.style.display !== 'none') hideModal();
+});

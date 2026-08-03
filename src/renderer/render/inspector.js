@@ -34,10 +34,38 @@ export async function selectAsset(assetId) {
   if (previewResult?.width && previewResult?.height) {
     renderImageDimensions(previewResult.width, previewResult.height);
   }
+}
 
-  document.querySelectorAll('.asset-card').forEach(card => {
-    card.classList.toggle('selected', parseInt(card.dataset.id) === assetId);
-  });
+export function clearInspector() {
+  state.selectedAsset = null;
+  document.getElementById('inspector-empty').style.display = 'flex';
+  document.getElementById('inspector-content').style.display = 'none';
+}
+
+export function showMultiSelection(count) {
+  state.selectedAsset = null;
+  document.getElementById('inspector-empty').style.display = 'none';
+  document.getElementById('inspector-content').style.display = 'flex';
+  document.getElementById('inspector-title').textContent = `${count} items selected`;
+
+  document.getElementById('inspector-preview').innerHTML = `
+    <div class="preview-placeholder" style="background: var(--accent-subtle);">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1" opacity="0.5">
+        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+      </svg>
+    </div>`;
+
+  document.getElementById('inspector-details').innerHTML = `
+    <div class="detail-row">
+      <span class="detail-value" style="color: var(--text-secondary);">${count} assets selected. Actions below will apply to all selected items.</span>
+    </div>`;
+
+  document.getElementById('inspector-tag-chips').innerHTML = '';
+  document.getElementById('inspector-collection-chips').innerHTML = '';
+
+  const favBtn = document.getElementById('inspector-fav-btn');
+  const selected = state.assets.filter(a => state.selectedAssetIds.includes(a.id));
+  favBtn.classList.toggle('active', selected.length > 0 && selected.every(a => a.is_favorite));
 }
 
 export function renderAssetDetails(asset) {

@@ -3,9 +3,10 @@ import { escapeHtml } from '../utils.js';
 import { showModal, hideModal } from './modal.js';
 
 export function showAddToCollectionModal() {
-  if (!state.selectedAsset) return;
+  const ids = state.selectedAssetIds.length ? state.selectedAssetIds : (state.selectedAsset ? [state.selectedAsset.id] : []);
+  if (ids.length === 0) return;
 
-  showModal('Add to Collection', `
+  showModal(ids.length > 1 ? `Add to Collection (${ids.length})` : 'Add to Collection', `
     <div class="form-group">
       <label>Select Collection</label>
       <select id="modal-select-collection" style="width:100%; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-primary); border-radius:var(--radius-sm); font-size:13px; font-family:inherit;">
@@ -29,9 +30,11 @@ export function showAddToCollectionModal() {
       const sel = document.getElementById('modal-select-collection');
       const colId = sel ? parseInt(sel.value) : 0;
       if (colId) {
-        await window.api.addAssetToCollection(state.selectedAsset.id, colId);
+        for (const id of ids) {
+          await window.api.addAssetToCollection(id, colId);
+        }
         document.dispatchEvent(new CustomEvent('sidebar-refresh'));
-        document.dispatchEvent(new CustomEvent('asset-refresh', { detail: { assetId: state.selectedAsset.id } }));
+        document.dispatchEvent(new CustomEvent('asset-refresh'));
         hideModal();
       }
     });
@@ -40,9 +43,11 @@ export function showAddToCollectionModal() {
       if (name) {
         const result = await window.api.addCollection(name);
         if (result && result.id) {
-          await window.api.addAssetToCollection(state.selectedAsset.id, result.id);
+          for (const id of ids) {
+            await window.api.addAssetToCollection(id, result.id);
+          }
           document.dispatchEvent(new CustomEvent('sidebar-refresh'));
-          document.dispatchEvent(new CustomEvent('asset-refresh', { detail: { assetId: state.selectedAsset.id } }));
+          document.dispatchEvent(new CustomEvent('asset-refresh'));
           hideModal();
         }
       }

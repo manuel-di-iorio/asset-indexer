@@ -3,8 +3,10 @@ import { loadLibraries, loadTags, loadCollections, loadCategoryCounts, loadAsset
 import { renderAssets } from './render/asset-grid.js';
 import { renderSources, renderTags, renderCollections } from './render/sidebar.js';
 import { updateBreadcrumb, updateSidebarActive } from './render/breadcrumb.js';
-import { selectAsset } from './render/inspector.js';
 import { hideContextMenu } from './context-menu.js';
+import { syncSelection, clearSelection, removeSelectedId } from './selection.js';
+import { toggleFavoriteSelected, copySelectedPaths, openSelectedInExplorer } from './bulk-actions.js';
+import { initKeyboardShortcuts } from './keyboard.js';
 import { showAddLibraryModal } from './modals/add-library.js';
 import { showAddTagModal } from './modals/add-tag.js';
 import { showAddTagToAssetModal } from './modals/add-tag-to-asset.js';
@@ -36,6 +38,19 @@ export function initEventListeners() {
   document.getElementById('btn-close').addEventListener('click', () => window.api.windowClose());
 
   document.addEventListener('click', hideContextMenu);
+
+  document.getElementById('asset-grid').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) clearSelection();
+  });
+
+  document.getElementById('bulk-btn-tag').addEventListener('click', showAddTagToAssetModal);
+  document.getElementById('bulk-btn-collection').addEventListener('click', showAddToCollectionModal);
+  document.getElementById('bulk-btn-favorite').addEventListener('click', () => {
+    toggleFavoriteSelected();
+    loadCategoryCounts();
+  });
+  document.getElementById('bulk-btn-copy').addEventListener('click', copySelectedPaths);
+  document.getElementById('bulk-btn-clear').addEventListener('click', clearSelection);
 
   document.getElementById('btn-rescan-all').addEventListener('click', async () => {
     const btn = document.getElementById('btn-rescan-all');
@@ -99,42 +114,41 @@ export function initEventListeners() {
   document.getElementById('btn-add-tag-to-asset').addEventListener('click', showAddTagToAssetModal);
   document.getElementById('btn-add-to-collection').addEventListener('click', showAddToCollectionModal);
 
-  document.getElementById('inspector-fav-btn').addEventListener('click', async () => {
-    if (!state.selectedAsset) return;
-    await window.api.toggleFavorite(state.selectedAsset.id);
-    await selectAsset(state.selectedAsset.id);
-    safeLoadAssets();
+  document.getElementById('inspector-fav-btn').addEventListener('click', () => {
+    toggleFavoriteSelected();
     loadCategoryCounts();
   });
 
   document.getElementById('btn-open-external').addEventListener('click', () => {
-    if (state.selectedAsset) window.api.openExternal(state.selectedAsset.file_path);
+    if (state.selectedAssetIds.length > 0 || state.selectedAsset) openSelectedInExplorer();
   });
 
   document.getElementById('btn-copy-path').addEventListener('click', (e) => {
-    if (state.selectedAsset) {
-      navigator.clipboard.writeText(state.selectedAsset.file_path);
-      const btn = e.currentTarget;
-      const original = btn.innerHTML;
-      btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Copied!`;
-      setTimeout(() => { btn.innerHTML = original; }, 1500);
+    if (state.selectedAssetIds.length === 0 && !state.selectedAsset) return;
+    if (state.selectedAssetIds.length > 1) {
+      copySelectedPaths();
+      return;
     }
+    const asset = state.selectedAsset || state.assets.find(a => a.id === state.selectedAssetIds[0]);
+    if (!asset) return;
+    navigator.clipboard.writeText(asset.file_path);
+    const btn = e.currentTarget;
+    const original = btn.innerHTML;
+    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Copied!`;
+    setTimeout(() => { btn.innerHTML = original; }, 1500);
   });
 
   window.api.onAssetAdded(() => doFullRefresh());
   window.api.onAssetUpdated(() => safeLoadAssets());
-  window.api.onAssetRemoved(() => {
+  window.api.onAssetRemoved((data) => {
+    if (data?.filePath) {
+      const removed = state.assets.find(a => a.file_path === data.filePath);
+      if (removed) removeSelectedId(removed.id);
+    }
     safeLoadAssets();
     loadCategoryCounts();
     loadLibraries().then(() => renderSources());
-    if (state.selectedAsset) {
-      document.getElementById('inspector-empty').style.display = 'flex';
-      document.getElementById('inspector-content').style.display = 'none';
-      state.selectedAsset = null;
-    }
   });
-
-  document.addEventListener('select-asset', (e) => selectAsset(e.detail.assetId));
 
   document.addEventListener('sidebar-update', () => {
     updateSidebarActive();
@@ -156,10 +170,10 @@ export function initEventListeners() {
 
   document.addEventListener('library-added', () => doFullRefresh());
 
-  document.addEventListener('asset-refresh', async (e) => {
-    if (e.detail && e.detail.assetId) {
-      await selectAsset(e.detail.assetId);
-    }
+  document.addEventListener('asset-refresh', async () => {
+    await syncSelection();
     safeLoadAssets();
   });
+
+  initKeyboardShortcuts();
 }

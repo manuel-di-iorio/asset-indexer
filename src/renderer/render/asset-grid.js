@@ -1,6 +1,8 @@
 import { state } from '../state.js';
 import { escapeHtml, getCategoryFromExt } from '../utils.js';
 import { CATEGORY_ICONS, CATEGORY_COLORS, CATEGORY_LABELS } from '../constants.js';
+import { selectSingle, toggleSelect, rangeSelect } from '../selection.js';
+import { showAssetContextMenu } from '../context-menu.js';
 
 let thumbObserver = null;
 let thumbnailCache = {};
@@ -110,19 +112,32 @@ export function renderAssets() {
   }
 
   emptyState.style.display = 'none';
-  const selId = state.selectedAsset ? state.selectedAsset.id : null;
   const frag = document.createDocumentFragment();
   const temp = document.createElement('div');
 
   state.assets.forEach(asset => {
     temp.innerHTML = createCardHTML(asset);
     const el = temp.firstElementChild;
-    if (asset.id === selId) el.classList.add('selected');
-    el.addEventListener('click', () => {
+    if (state.selectedAssetIds.includes(asset.id)) el.classList.add('selected');
+    if (asset.id === state.focusedAssetId) el.classList.add('focused');
+    el.addEventListener('click', (e) => {
       if (currentRenderId !== renderId) return;
-      document.dispatchEvent(new CustomEvent('select-asset', { detail: { assetId: asset.id } }));
-      grid.querySelectorAll('.asset-card.selected').forEach(c => c.classList.remove('selected'));
-      el.classList.add('selected');
+      if (e.shiftKey) {
+        rangeSelect(asset.id);
+      } else if (e.ctrlKey || e.metaKey) {
+        toggleSelect(asset.id);
+      } else {
+        selectSingle(asset.id);
+      }
+    });
+    el.addEventListener('contextmenu', (e) => {
+      if (currentRenderId !== renderId) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (!state.selectedAssetIds.includes(asset.id)) {
+        selectSingle(asset.id);
+      }
+      showAssetContextMenu(e.clientX, e.clientY);
     });
     frag.appendChild(el);
   });

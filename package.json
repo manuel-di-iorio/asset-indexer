@@ -1,6 +1,6 @@
 {
   "name": "asset-indexer",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Intelligent asset indexer for game developers",
   "main": "dist-electron/main.js",
   "scripts": {

@@ -4,6 +4,8 @@ export const state = {
   sortBy: 'name',
   viewMode: 'grid',
   selectedAsset: null,
+  selectedAssetIds: [],
+  focusedAssetId: null,
   favorites: false,
   collectionId: null,
   tagId: null,

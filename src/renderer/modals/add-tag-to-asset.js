@@ -3,10 +3,14 @@ import { escapeHtml } from '../utils.js';
 import { showModal, hideModal } from './modal.js';
 
 export function showAddTagToAssetModal() {
-  if (!state.selectedAsset) return;
-  const assetTags = state.selectedAsset.tags ? state.selectedAsset.tags.split(',') : [];
+  const ids = state.selectedAssetIds.length ? state.selectedAssetIds : (state.selectedAsset ? [state.selectedAsset.id] : []);
+  if (ids.length === 0) return;
 
-  showModal('Add Tag to Asset', `
+  const primaryId = state.focusedAssetId !== null ? state.focusedAssetId : ids[0];
+  const primary = state.assets.find(a => a.id === primaryId) || state.selectedAsset || null;
+  const assetTags = primary ? (primary.tags ? primary.tags.split(',') : []) : [];
+
+  showModal(ids.length > 1 ? `Add Tag to ${ids.length} Assets` : 'Add Tag to Asset', `
     <div class="form-group">
       <label>Select Tag</label>
       <select id="modal-select-tag" style="width:100%; padding:8px 12px; background:var(--bg-input); border:1px solid var(--border-color); color:var(--text-primary); border-radius:var(--radius-sm); font-size:13px; font-family:inherit;">
@@ -31,9 +35,11 @@ export function showAddTagToAssetModal() {
       const sel = document.getElementById('modal-select-tag');
       const tagId = sel ? parseInt(sel.value) : 0;
       if (tagId) {
-        await window.api.addTagToAsset(state.selectedAsset.id, tagId);
-        document.dispatchEvent(new CustomEvent('asset-refresh', { detail: { assetId: state.selectedAsset.id } }));
+        for (const id of ids) {
+          await window.api.addTagToAsset(id, tagId);
+        }
         document.dispatchEvent(new CustomEvent('sidebar-refresh'));
+        document.dispatchEvent(new CustomEvent('asset-refresh'));
         hideModal();
       }
     });
@@ -43,9 +49,11 @@ export function showAddTagToAssetModal() {
       if (name) {
         const result = await window.api.addTag(name, color);
         if (result && result.id) {
-          await window.api.addTagToAsset(state.selectedAsset.id, result.id);
-          document.dispatchEvent(new CustomEvent('asset-refresh', { detail: { assetId: state.selectedAsset.id } }));
+          for (const id of ids) {
+            await window.api.addTagToAsset(id, result.id);
+          }
           document.dispatchEvent(new CustomEvent('sidebar-refresh'));
+          document.dispatchEvent(new CustomEvent('asset-refresh'));
           hideModal();
         }
       }
