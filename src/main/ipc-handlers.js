@@ -3,7 +3,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { ipcMain, dialog, shell, nativeImage } = require('electron');
 const { getAssetCategory } = require('./constants');
-const { scanDirectory } = require('./scanner');
+const { scanDirectory, pruneStaleAssets } = require('./scanner');
 const { setupWatcher, stopWatcher, ignorePath } = require('./watchers');
 
 const THUMB_CACHE_DIR = null;
@@ -128,7 +128,7 @@ function registerIpcHandlers(db, getMainWindow, app) {
     const info = insertLib.run(dirPath, folderName, ignoreRegex || '');
     const libraryId = info.lastInsertRowid;
 
-    const count = await scanDirectory(db, dirPath, libraryId, ignoreRegex);
+    const count = await scanDirectory(db, dirPath, libraryId, ignoreRegex).then(r => r.count);
     const mainWindow = getMainWindow();
     setupWatcher(db, mainWindow, dirPath, libraryId, ignoreRegex);
     invalidateCountCache();
@@ -154,11 +154,8 @@ function registerIpcHandlers(db, getMainWindow, app) {
     const lib = db.prepare('SELECT * FROM libraries WHERE id = ?').get(libraryId);
     if (!lib) return { error: 'Library not found' };
 
-    db.prepare('DELETE FROM asset_collections WHERE asset_id IN (SELECT id FROM assets WHERE library_id = ?)').run(libraryId);
-    db.prepare('DELETE FROM asset_tags WHERE asset_id IN (SELECT id FROM assets WHERE library_id = ?)').run(libraryId);
-    db.prepare('DELETE FROM assets WHERE library_id = ?').run(libraryId);
-
-    const count = await scanDirectory(db, lib.path, libraryId, lib.ignore_regex);
+    const { count, files } = await scanDirectory(db, lib.path, libraryId, lib.ignore_regex);
+    pruneStaleAssets(db, libraryId, files);
     const mainWindow = getMainWindow();
     setupWatcher(db, mainWindow, lib.path, libraryId, lib.ignore_regex);
     invalidateCountCache();
@@ -171,10 +168,9 @@ function registerIpcHandlers(db, getMainWindow, app) {
     const mainWindow = getMainWindow();
     let total = 0;
     for (const lib of libraries) {
-      db.prepare('DELETE FROM asset_collections WHERE asset_id IN (SELECT id FROM assets WHERE library_id = ?)').run(lib.id);
-      db.prepare('DELETE FROM asset_tags WHERE asset_id IN (SELECT id FROM assets WHERE library_id = ?)').run(lib.id);
-      db.prepare('DELETE FROM assets WHERE library_id = ?').run(lib.id);
-      total += await scanDirectory(db, lib.path, lib.id, lib.ignore_regex);
+      const { count, files } = await scanDirectory(db, lib.path, lib.id, lib.ignore_regex);
+      pruneStaleAssets(db, lib.id, files);
+      total += count;
       setupWatcher(db, mainWindow, lib.path, lib.id, lib.ignore_regex);
     }
     invalidateCountCache();

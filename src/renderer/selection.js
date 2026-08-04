@@ -25,10 +25,24 @@ export function updateSelectionUI() {
     removeTagBtn.style.display = hasTags ? '' : 'none';
   }
 
+  const addTagBtn = document.getElementById('bulk-btn-tag');
+  if (addTagBtn) {
+    const selected = state.assets.filter(a => state.selectedAssetIds.includes(a.id));
+    const hasAddableTag = state.tags.some(tag => selected.some(a => !(a.tags || '').split(',').map(s => s.trim()).includes(tag.name)));
+    addTagBtn.style.display = hasAddableTag ? '' : 'none';
+  }
+
   const removeColBtn = document.getElementById('bulk-btn-remove-collection');
   if (removeColBtn) {
     const hasCollections = state.assets.some(a => state.selectedAssetIds.includes(a.id) && a.collections);
     removeColBtn.style.display = hasCollections ? '' : 'none';
+  }
+
+  const addColBtn = document.getElementById('bulk-btn-collection');
+  if (addColBtn) {
+    const selected = state.assets.filter(a => state.selectedAssetIds.includes(a.id));
+    const hasAddableCol = state.collections.some(c => selected.some(a => !(a.collections || '').split(',').map(s => s.trim()).includes(c.name)));
+    addColBtn.style.display = hasAddableCol ? '' : 'none';
   }
 
   const openBtn = document.getElementById('btn-open-external');

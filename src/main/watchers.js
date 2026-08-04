@@ -54,8 +54,20 @@ function setupWatcher(db, mainWindow, libraryPath, libraryId, ignoreRegex) {
       const category = getAssetCategory(ext);
       const meta = metadataFor(filePath, category);
       db.prepare(`
-        INSERT OR REPLACE INTO assets (library_id, file_path, file_name, file_ext, file_size, modified_date, created_date, category, width, height, bit_depth, has_alpha)
+        INSERT INTO assets (library_id, file_path, file_name, file_ext, file_size, modified_date, created_date, category, width, height, bit_depth, has_alpha)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(file_path) DO UPDATE SET
+          library_id = excluded.library_id,
+          file_name = excluded.file_name,
+          file_ext = excluded.file_ext,
+          file_size = excluded.file_size,
+          modified_date = excluded.modified_date,
+          created_date = excluded.created_date,
+          category = excluded.category,
+          width = excluded.width,
+          height = excluded.height,
+          bit_depth = excluded.bit_depth,
+          has_alpha = excluded.has_alpha
       `).run(libraryId, filePath, path.basename(filePath), ext, stat.size, stat.mtime.toISOString(), stat.birthtime.toISOString(), category,
         meta ? meta[0] : null, meta ? meta[1] : null, meta ? meta[2] : null, meta ? meta[3] : null);
       mainWindow?.webContents.send('asset-added', { libraryId, filePath });

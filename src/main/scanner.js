@@ -51,8 +51,20 @@ async function getAllFiles(dirPath, ignoreRegex, signal) {
 
 async function scanDirectory(db, dirPath, libraryId, ignoreRegex, signal) {
   const insertAsset = db.prepare(`
-    INSERT OR REPLACE INTO assets (library_id, file_path, file_name, file_ext, file_size, modified_date, created_date, category, width, height, bit_depth, has_alpha)
+    INSERT INTO assets (library_id, file_path, file_name, file_ext, file_size, modified_date, created_date, category, width, height, bit_depth, has_alpha)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(file_path) DO UPDATE SET
+      library_id = excluded.library_id,
+      file_name = excluded.file_name,
+      file_ext = excluded.file_ext,
+      file_size = excluded.file_size,
+      modified_date = excluded.modified_date,
+      created_date = excluded.created_date,
+      category = excluded.category,
+      width = excluded.width,
+      height = excluded.height,
+      bit_depth = excluded.bit_depth,
+      has_alpha = excluded.has_alpha
   `);
 
   const files = await getAllFiles(dirPath, ignoreRegex, signal);
@@ -82,7 +94,20 @@ async function scanDirectory(db, dirPath, libraryId, ignoreRegex, signal) {
   });
 
   insertMany(files);
-  return files.length;
+  return { count: files.length, files };
 }
 
-module.exports = { scanDirectory, getAllFiles };
+function pruneStaleAssets(db, libraryId, existingPaths) {
+  const existing = new Set(existingPaths.map(p => p.toLowerCase()));
+  const rows = db.prepare('SELECT id, file_path FROM assets WHERE library_id = ?').all(libraryId);
+  const stale = rows.filter(r => !existing.has(r.file_path.toLowerCase())).map(r => r.id);
+  if (stale.length === 0) return 0;
+  const del = db.prepare('DELETE FROM assets WHERE id = ?');
+  const tx = db.transaction((ids) => {
+    for (const id of ids) del.run(id);
+  });
+  tx(stale);
+  return stale.length;
+}
+
+module.exports = { scanDirectory, getAllFiles, pruneStaleAssets };
