@@ -15,10 +15,12 @@ export function showContextMenu(x, y, items) {
   const menu = document.getElementById('context-menu');
   menu.innerHTML = items.map((item, i) => {
     if (item.type === 'separator') return '<div class="context-menu-separator"></div>';
-    return `<div class="context-menu-item${item.danger ? ' danger' : ''}" data-action="${item.action}">${item.icon || ''}${escapeHtml(item.label)}</div>`;
+    const disabled = item.disabled ? ' disabled' : '';
+    return `<div class="context-menu-item${item.danger ? ' danger' : ''}${disabled}" data-action="${item.action}" ${item.disabled ? 'data-disabled="true"' : ''}>${item.icon || ''}${escapeHtml(item.label)}</div>`;
   }).join('');
 
   menu.querySelectorAll('.context-menu-item').forEach(el => {
+    if (el.dataset.disabled === 'true') return;
     el.addEventListener('click', (e) => {
       e.stopPropagation();
       handleContextAction(el.dataset.action);
@@ -98,7 +100,7 @@ export function showAssetContextMenu(x, y) {
     { label: 'Toggle Favorite', icon: ASSET_MENU_ICONS.favorite, action: 'favorite-selected' },
     { type: 'separator' },
     { label: 'Copy Paths', icon: ASSET_MENU_ICONS.copy, action: 'copy-paths' },
-    { label: 'Open in File Explorer', icon: ASSET_MENU_ICONS.open, action: 'open-selected' }
+    { label: 'Open in File Explorer', icon: ASSET_MENU_ICONS.open, action: 'open-selected', disabled: n > 1 }
   ]);
 }
 

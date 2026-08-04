@@ -106,6 +106,12 @@ export function initEventListeners() {
     document.getElementById('btn-grid-view').classList.remove('active');
   });
 
+  document.getElementById('btn-toggle-inspector').addEventListener('click', () => {
+    state.inspectorVisible = !state.inspectorVisible;
+    document.getElementById('inspector').classList.toggle('hidden', !state.inspectorVisible);
+    document.getElementById('btn-toggle-inspector').classList.toggle('active', state.inspectorVisible);
+  });
+
   document.getElementById('btn-add-library').addEventListener('click', showAddLibraryModal);
   document.getElementById('btn-empty-add-library').addEventListener('click', showAddLibraryModal);
 

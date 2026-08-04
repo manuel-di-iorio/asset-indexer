@@ -2,6 +2,7 @@ import { state } from './state.js';
 import { selectAsset, clearInspector, showMultiSelection } from './render/inspector.js';
 
 let selectionToken = 0;
+let anchorId = null;
 
 export function getSelectedIds() {
   return state.selectedAssetIds;
@@ -18,8 +19,12 @@ export function updateSelectionUI() {
   const bulkCount = document.getElementById('bulk-count');
   if (bulkCount) bulkCount.textContent = `${n} selected`;
 
+  const openBtn = document.getElementById('btn-open-external');
+  if (openBtn) openBtn.disabled = n > 1;
+
   const grid = document.getElementById('asset-grid');
   if (grid) {
+    grid.classList.toggle('has-bulk', n > 1);
     grid.querySelectorAll('.asset-card').forEach(card => {
       const id = parseInt(card.dataset.id);
       card.classList.toggle('selected', state.selectedAssetIds.includes(id));
@@ -49,13 +54,14 @@ export async function syncSelection() {
 export async function selectSingle(id) {
   state.selectedAssetIds = [id];
   state.focusedAssetId = id;
+  anchorId = id;
   await syncSelection();
 }
 
 export async function toggleSelect(id) {
-  const idx = state.selectedAssetIds.indexOf(id);
-  if (idx >= 0) {
-    state.selectedAssetIds.splice(idx, 1);
+  const wasSelected = state.selectedAssetIds.includes(id);
+  if (wasSelected) {
+    state.selectedAssetIds.splice(state.selectedAssetIds.indexOf(id), 1);
     if (id === state.focusedAssetId) {
       state.focusedAssetId = state.selectedAssetIds.length
         ? state.selectedAssetIds[state.selectedAssetIds.length - 1]
@@ -64,6 +70,10 @@ export async function toggleSelect(id) {
   } else {
     state.selectedAssetIds.push(id);
     state.focusedAssetId = id;
+    if (anchorId === null) anchorId = id;
+  }
+  if (anchorId !== null && !state.selectedAssetIds.includes(anchorId)) {
+    anchorId = state.selectedAssetIds.length ? state.selectedAssetIds[0] : null;
   }
   await syncSelection();
 }
@@ -73,12 +83,15 @@ export async function rangeSelect(id) {
   const end = list.indexOf(id);
   if (end < 0) { await selectSingle(id); return; }
 
-  let anchorIdx = state.focusedAssetId !== null && list.includes(state.focusedAssetId)
-    ? list.indexOf(state.focusedAssetId)
-    : (state.selectedAssetIds.length ? list.indexOf(state.selectedAssetIds[state.selectedAssetIds.length - 1]) : -1);
+  let anchor = anchorId;
+  if (anchor === null || !list.includes(anchor)) {
+    anchor = state.focusedAssetId !== null && list.includes(state.focusedAssetId)
+      ? state.focusedAssetId
+      : (state.selectedAssetIds.length ? state.selectedAssetIds[state.selectedAssetIds.length - 1] : null);
+  }
+  if (anchor === null) { await selectSingle(id); return; }
 
-  if (anchorIdx < 0) { await selectSingle(id); return; }
-
+  const anchorIdx = list.indexOf(anchor);
   const from = Math.min(anchorIdx, end);
   const to = Math.max(anchorIdx, end);
   state.selectedAssetIds = list.slice(from, to + 1);
@@ -90,6 +103,7 @@ export function selectAll() {
   if (state.assets.length === 0) return;
   state.selectedAssetIds = state.assets.map(a => a.id);
   state.focusedAssetId = state.assets[state.assets.length - 1].id;
+  anchorId = state.assets[0].id;
   syncSelection();
 }
 
@@ -97,6 +111,7 @@ export function selectFirst() {
   if (state.assets.length === 0) return;
   state.selectedAssetIds = [state.assets[0].id];
   state.focusedAssetId = state.assets[0].id;
+  anchorId = state.assets[0].id;
   syncSelection();
 }
 
@@ -105,12 +120,14 @@ export function selectLast() {
   const id = state.assets[state.assets.length - 1].id;
   state.selectedAssetIds = [id];
   state.focusedAssetId = id;
+  anchorId = id;
   syncSelection();
 }
 
 export function clearSelection() {
   state.selectedAssetIds = [];
   state.focusedAssetId = null;
+  anchorId = null;
   syncSelection();
 }
 
@@ -172,6 +189,9 @@ export function removeSelectedId(removedId) {
     state.focusedAssetId = state.selectedAssetIds.length
       ? state.selectedAssetIds[Math.min(idx, state.selectedAssetIds.length - 1)]
       : null;
+  }
+  if (anchorId === removedId) {
+    anchorId = state.selectedAssetIds.length ? state.selectedAssetIds[0] : null;
   }
   if (state.selectedAsset && state.selectedAsset.id === removedId) state.selectedAsset = null;
   syncSelection();

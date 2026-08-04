@@ -33,6 +33,7 @@ export function copySelectedPaths() {
 }
 
 export function openSelectedInExplorer() {
+  if (state.selectedAssetIds.length > 1) return;
   if (state.selectedAsset) {
     window.api.openExternal(state.selectedAsset.file_path);
     return;

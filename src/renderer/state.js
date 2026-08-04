@@ -3,6 +3,7 @@ export const state = {
   searchQuery: '',
   sortBy: 'name',
   viewMode: 'grid',
+  inspectorVisible: true,
   selectedAsset: null,
   selectedAssetIds: [],
   focusedAssetId: null,
