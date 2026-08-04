@@ -13,6 +13,7 @@ import { showAddTagToAssetModal } from './modals/add-tag-to-asset.js';
 import { showAddCollectionModal } from './modals/add-collection.js';
 import { showAddToCollectionModal } from './modals/add-to-collection.js';
 import { showRemoveTagFromAssetsModal } from './modals/remove-tag-from-assets.js';
+import { showRemoveFromCollectionModal } from './modals/remove-from-collection.js';
 
 let searchTimeout = null;
 let requestId = 0;
@@ -47,6 +48,7 @@ export function initEventListeners() {
   document.getElementById('bulk-btn-tag').addEventListener('click', showAddTagToAssetModal);
   document.getElementById('bulk-btn-remove-tag').addEventListener('click', showRemoveTagFromAssetsModal);
   document.getElementById('bulk-btn-collection').addEventListener('click', showAddToCollectionModal);
+  document.getElementById('bulk-btn-remove-collection').addEventListener('click', showRemoveFromCollectionModal);
   document.getElementById('bulk-btn-favorite').addEventListener('click', () => {
     toggleFavoriteSelected();
     loadCategoryCounts();

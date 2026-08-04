@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('api', {
   deleteCollection: (id) => ipcRenderer.invoke('delete-collection', id),
   addAssetToCollection: (assetId, collectionId) => ipcRenderer.invoke('add-asset-to-collection', assetId, collectionId),
   removeAssetFromCollection: (assetId, collectionId) => ipcRenderer.invoke('remove-asset-from-collection', assetId, collectionId),
+  removeAssetFromCollections: (assetIds, collectionId) => ipcRenderer.invoke('remove-asset-from-collections', assetIds, collectionId),
 
   getCategoryCounts: () => ipcRenderer.invoke('get-category-counts'),
   getTotalAssets: () => ipcRenderer.invoke('get-total-assets'),

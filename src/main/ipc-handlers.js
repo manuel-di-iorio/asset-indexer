@@ -182,7 +182,15 @@ function registerIpcHandlers(db, getMainWindow, app) {
   });
 
   ipcMain.handle('get-assets', (event, params) => {
-    let query = 'SELECT a.*, GROUP_CONCAT(t.name) as tags, GROUP_CONCAT(t.color) as tag_colors FROM assets a LEFT JOIN asset_tags at ON a.id = at.asset_id LEFT JOIN tags t ON at.tag_id = t.id';
+    let query = `SELECT a.*,
+      GROUP_CONCAT(DISTINCT t.name) as tags,
+      GROUP_CONCAT(DISTINCT t.color) as tag_colors,
+      GROUP_CONCAT(DISTINCT c.name) as collections
+    FROM assets a
+    LEFT JOIN asset_tags at ON a.id = at.asset_id
+    LEFT JOIN tags t ON at.tag_id = t.id
+    LEFT JOIN asset_collections ac ON a.id = ac.asset_id
+    LEFT JOIN collections c ON ac.collection_id = c.id`;
     const conditions = [];
     const values = [];
 
@@ -404,6 +412,15 @@ function registerIpcHandlers(db, getMainWindow, app) {
 
   ipcMain.handle('remove-asset-from-collection', (event, assetId, collectionId) => {
     db.prepare('DELETE FROM asset_collections WHERE asset_id = ? AND collection_id = ?').run(assetId, collectionId);
+    return true;
+  });
+
+  ipcMain.handle('remove-asset-from-collections', (event, assetIds, collectionId) => {
+    const stmt = db.prepare('DELETE FROM asset_collections WHERE asset_id = ? AND collection_id = ?');
+    const tx = db.transaction((ids) => {
+      for (const id of ids) stmt.run(id, collectionId);
+    });
+    tx(assetIds);
     return true;
   });
 

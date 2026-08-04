@@ -4,6 +4,7 @@ import { loadLibraries, loadAssets, loadTags, loadCollections, loadCategoryCount
 import { showAddTagToAssetModal } from './modals/add-tag-to-asset.js';
 import { showAddToCollectionModal } from './modals/add-to-collection.js';
 import { showRemoveTagFromAssetsModal } from './modals/remove-tag-from-assets.js';
+import { showRemoveFromCollectionModal } from './modals/remove-from-collection.js';
 import { toggleFavoriteSelected, copySelectedPaths, openSelectedInExplorer } from './bulk-actions.js';
 
 let contextMenuTarget = null;
@@ -75,6 +76,8 @@ async function handleContextAction(action) {
     showAddTagToAssetModal();
   } else if (action === 'remove-tag-selected') {
     showRemoveTagFromAssetsModal();
+  } else if (action === 'remove-collection-selected') {
+    showRemoveFromCollectionModal();
   } else if (action === 'collection-selected') {
     showAddToCollectionModal();
   } else if (action === 'favorite-selected') {
@@ -96,16 +99,30 @@ const ASSET_MENU_ICONS = {
 
 export function showAssetContextMenu(x, y) {
   const n = state.selectedAssetIds.length;
-  showContextMenu(x, y, [
-    { label: `Add Tag (${n})`, icon: ASSET_MENU_ICONS.tag, action: 'tag-selected' },
-    { label: `Remove Tag (${n})`, icon: ASSET_MENU_ICONS.tag, action: 'remove-tag-selected' },
-    { label: `Add to Collection (${n})`, icon: ASSET_MENU_ICONS.folder, action: 'collection-selected' },
+  const hasTags = state.assets.some(a => state.selectedAssetIds.includes(a.id) && a.tags);
+  const hasCollections = state.assets.some(a => state.selectedAssetIds.includes(a.id) && a.collections);
+
+  const items = [
+    { label: `Add Tag (${n})`, icon: ASSET_MENU_ICONS.tag, action: 'tag-selected' }
+  ];
+  if (hasTags) {
+    items.push({ label: `Remove Tag (${n})`, icon: ASSET_MENU_ICONS.tag, action: 'remove-tag-selected' });
+  }
+  items.push(
+    { label: `Add to Collection (${n})`, icon: ASSET_MENU_ICONS.folder, action: 'collection-selected' }
+  );
+  if (hasCollections) {
+    items.push({ label: `Remove from Collection (${n})`, icon: ASSET_MENU_ICONS.folder, action: 'remove-collection-selected' });
+  }
+  items.push(
     { type: 'separator' },
     { label: 'Toggle Favorite', icon: ASSET_MENU_ICONS.favorite, action: 'favorite-selected' },
     { type: 'separator' },
     { label: 'Copy Paths', icon: ASSET_MENU_ICONS.copy, action: 'copy-paths' },
     { label: 'Open in File Explorer', icon: ASSET_MENU_ICONS.open, action: 'open-selected', disabled: n > 1 }
-  ]);
+  );
+
+  showContextMenu(x, y, items);
 }
 
 export function hideContextMenu() {

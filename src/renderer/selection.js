@@ -19,6 +19,18 @@ export function updateSelectionUI() {
   const bulkCount = document.getElementById('bulk-count');
   if (bulkCount) bulkCount.textContent = `${n} selected`;
 
+  const removeTagBtn = document.getElementById('bulk-btn-remove-tag');
+  if (removeTagBtn) {
+    const hasTags = state.assets.some(a => state.selectedAssetIds.includes(a.id) && a.tags);
+    removeTagBtn.style.display = hasTags ? '' : 'none';
+  }
+
+  const removeColBtn = document.getElementById('bulk-btn-remove-collection');
+  if (removeColBtn) {
+    const hasCollections = state.assets.some(a => state.selectedAssetIds.includes(a.id) && a.collections);
+    removeColBtn.style.display = hasCollections ? '' : 'none';
+  }
+
   const openBtn = document.getElementById('btn-open-external');
   if (openBtn) openBtn.disabled = n > 1;
 
