@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('api', {
   deleteTag: (id) => ipcRenderer.invoke('delete-tag', id),
   addTagToAsset: (assetId, tagId) => ipcRenderer.invoke('add-tag-to-asset', assetId, tagId),
   removeTagFromAsset: (assetId, tagId) => ipcRenderer.invoke('remove-tag-from-asset', assetId, tagId),
+  removeTagFromAssets: (assetIds, tagId) => ipcRenderer.invoke('remove-tag-from-assets', assetIds, tagId),
+  renameAsset: (assetId, newName) => ipcRenderer.invoke('rename-asset', assetId, newName),
 
   getCollections: () => ipcRenderer.invoke('get-collections'),
   addCollection: (name, desc) => ipcRenderer.invoke('add-collection', name, desc),

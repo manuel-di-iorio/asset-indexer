@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const { ipcMain, dialog, shell, nativeImage } = require('electron');
 const { getAssetCategory } = require('./constants');
 const { scanDirectory } = require('./scanner');
-const { setupWatcher, stopWatcher } = require('./watchers');
+const { setupWatcher, stopWatcher, ignorePath } = require('./watchers');
 
 const THUMB_CACHE_DIR = null;
 
@@ -218,14 +218,15 @@ function registerIpcHandlers(db, getMainWindow, app) {
 
     if (params.sort) {
       switch (params.sort) {
-        case 'name': query += ' ORDER BY a.file_name ASC'; break;
-        case 'size': query += ' ORDER BY a.file_size DESC'; break;
-        case 'modified': query += ' ORDER BY a.modified_date DESC'; break;
-        case 'type': query += ' ORDER BY a.file_ext ASC'; break;
-        default: query += ' ORDER BY a.file_name ASC';
+        case 'name': query += ' ORDER BY a.file_name COLLATE NOCASE ASC, a.id ASC'; break;
+        case 'size': query += ' ORDER BY a.file_size DESC, a.id DESC'; break;
+        case 'modified': query += ' ORDER BY a.modified_date DESC, a.id DESC'; break;
+        case 'created': query += ' ORDER BY a.created_date DESC, a.id DESC'; break;
+        case 'type': query += ' ORDER BY a.file_ext ASC, a.file_name COLLATE NOCASE ASC, a.id ASC'; break;
+        default: query += ' ORDER BY a.file_name COLLATE NOCASE ASC, a.id ASC';
       }
     } else {
-      query += ' ORDER BY a.file_name ASC';
+      query += ' ORDER BY a.file_name COLLATE NOCASE ASC, a.id ASC';
     }
 
     if (params.limit) {
@@ -333,6 +334,44 @@ function registerIpcHandlers(db, getMainWindow, app) {
   ipcMain.handle('remove-tag-from-asset', (event, assetId, tagId) => {
     db.prepare('DELETE FROM asset_tags WHERE asset_id = ? AND tag_id = ?').run(assetId, tagId);
     return true;
+  });
+
+  ipcMain.handle('remove-tag-from-assets', (event, assetIds, tagId) => {
+    const stmt = db.prepare('DELETE FROM asset_tags WHERE asset_id = ? AND tag_id = ?');
+    const tx = db.transaction((ids) => {
+      for (const id of ids) stmt.run(id, tagId);
+    });
+    tx(assetIds);
+    return true;
+  });
+
+  ipcMain.handle('rename-asset', (event, assetId, newName) => {
+    const asset = db.prepare('SELECT * FROM assets WHERE id = ?').get(assetId);
+    if (!asset) return { error: 'Asset not found' };
+    if (!newName || !newName.trim()) return { error: 'Name cannot be empty' };
+    const cleanName = newName.trim();
+    if (cleanName.includes('/') || cleanName.includes('\\')) return { error: 'Name cannot contain path separators' };
+
+    const dir = path.dirname(asset.file_path);
+    const newPath = path.join(dir, cleanName);
+    if (newPath === asset.file_path) return { error: 'Name is unchanged' };
+    if (fs.existsSync(newPath)) return { error: 'A file with that name already exists' };
+
+    const ext = path.extname(cleanName).toLowerCase();
+    const category = getAssetCategory(ext);
+
+    try {
+      ignorePath(asset.file_path);
+      ignorePath(newPath);
+      fs.renameSync(asset.file_path, newPath);
+      try { fs.unlinkSync(getThumbCachePath(asset.file_path, cacheDir)); } catch (e) {}
+      db.prepare('UPDATE assets SET file_path = ?, file_name = ?, file_ext = ?, category = ? WHERE id = ?')
+        .run(newPath, cleanName, ext, category, assetId);
+      invalidateCountCache();
+      return { ok: true, id: assetId, file_path: newPath, file_name: cleanName, file_ext: ext, category };
+    } catch (e) {
+      return { error: e.message };
+    }
   });
 
   ipcMain.handle('get-collections', () => {

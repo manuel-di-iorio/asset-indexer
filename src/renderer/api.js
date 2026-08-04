@@ -1,5 +1,28 @@
 import { state } from './state.js';
 
+export const PAGE_SIZE = 500;
+
+let assetsToken = 0;
+
+function buildParams(offset, limit) {
+  return {
+    category: state.currentCategory === 'favorites' ? 'all' : state.currentCategory,
+    search: state.searchQuery,
+    sort: state.sortBy,
+    favorites: state.favorites,
+    collectionId: state.collectionId,
+    tagId: state.tagId,
+    libraryIds: state.libraryIds,
+    limit,
+    offset
+  };
+}
+
+function updateCountLabels() {
+  document.getElementById('asset-count-label').textContent = `${state.totalCount.toLocaleString()} assets`;
+  document.getElementById('status-selected').textContent = state.selectedAssetIds.length ? `${state.selectedAssetIds.length} selected` : '0 selected';
+}
+
 export async function loadLibraries() {
   state.libraries = await window.api.getLibraries();
 }
@@ -30,19 +53,26 @@ export async function loadCategoryCounts() {
 }
 
 export async function loadAssets() {
-  const params = {
-    category: state.currentCategory === 'favorites' ? 'all' : state.currentCategory,
-    search: state.searchQuery,
-    sort: state.sortBy,
-    favorites: state.favorites,
-    collectionId: state.collectionId,
-    tagId: state.tagId,
-    libraryIds: state.libraryIds,
-    limit: 500
-  };
+  const token = ++assetsToken;
+  state.assets = await window.api.getAssets(buildParams(0, PAGE_SIZE));
+  if (token !== assetsToken) return;
+  state.totalCount = await window.api.getAssetCount(buildParams(0));
+  if (token !== assetsToken) return;
+  state.hasMore = state.assets.length < state.totalCount;
+  updateCountLabels();
+}
 
-  state.assets = await window.api.getAssets(params);
-  state.totalCount = await window.api.getAssetCount(params);
-  document.getElementById('asset-count-label').textContent = `${state.totalCount.toLocaleString()} assets`;
-  document.getElementById('status-selected').textContent = state.selectedAssetIds.length ? `${state.selectedAssetIds.length} selected` : '0 selected';
+export async function loadMoreAssets() {
+  const token = assetsToken;
+  if (state.isLoading || !state.hasMore) return;
+  state.isLoading = true;
+  let more = [];
+  try {
+    more = await window.api.getAssets(buildParams(state.assets.length, PAGE_SIZE));
+  } finally {
+    state.isLoading = false;
+  }
+  if (token !== assetsToken) return;
+  state.assets.push(...more);
+  state.hasMore = state.assets.length < state.totalCount;
 }

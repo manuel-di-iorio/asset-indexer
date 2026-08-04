@@ -12,6 +12,29 @@ function detailRow(label, value, cls = '') {
   `;
 }
 
+function gcd(a, b) {
+  while (b) { [a, b] = [b, a % b]; }
+  return a;
+}
+
+function ratioString(w, h) {
+  const g = gcd(w, h);
+  const rw = w / g;
+  const rh = h / g;
+  if (rw > 21 || rh > 21) return null;
+  return `${rw}:${rh}`;
+}
+
+function textureResolution(maxDim) {
+  if (maxDim >= 8192) return '8K';
+  if (maxDim >= 4096) return '4K';
+  if (maxDim >= 2048) return '2K';
+  if (maxDim >= 1024) return '1K';
+  if (maxDim >= 512) return '512';
+  if (maxDim >= 256) return '256';
+  return null;
+}
+
 export async function selectAsset(assetId) {
   const asset = await window.api.getAsset(assetId);
   if (!asset) return;
@@ -82,6 +105,19 @@ export function renderAssetDetails(asset) {
   details += detailRow('Created', formatDate(asset.created_date));
   details += detailRow('Extension', ext);
 
+  if (category === 'images') {
+    if (asset.width && asset.height) {
+      const ratio = ratioString(asset.width, asset.height);
+      details += detailRow('Dimensions', `${asset.width}×${asset.height}px${ratio ? ` (${ratio})` : ''}`);
+      const res = textureResolution(Math.max(asset.width, asset.height));
+      if (res) details += detailRow('Resolution', res);
+    }
+    if (asset.bit_depth) details += detailRow('Bit Depth', `${asset.bit_depth}-bit`);
+    if (asset.has_alpha !== null && asset.has_alpha !== undefined) {
+      details += detailRow('Alpha Channel', asset.has_alpha ? 'Yes' : 'No');
+    }
+  }
+
   if (category === '3d-models') {
     details += detailRow('Format', ext.replace('.', '').toUpperCase());
   } else if (category === 'textures') {
@@ -101,7 +137,9 @@ export function renderAssetDetails(asset) {
 
 function renderImageDimensions(width, height) {
   const container = document.getElementById('inspector-details');
-  container.innerHTML += detailRow('Dimensions', `${width}×${height}px`);
+  if (container.innerHTML.includes('Dimensions')) return;
+  const ratio = ratioString(width, height);
+  container.innerHTML += detailRow('Dimensions', `${width}×${height}px${ratio ? ` (${ratio})` : ''}`);
 }
 
 export function renderAssetTags(asset) {

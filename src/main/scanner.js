@@ -1,6 +1,14 @@
 const path = require('path');
 const fs = require('fs');
 const { ALL_EXTENSIONS, getAssetCategory } = require('./constants');
+const { extractImageMetadata } = require('./metadata');
+
+function metadataFor(filePath, category) {
+  if (category !== 'images') return null;
+  const meta = extractImageMetadata(filePath);
+  if (!meta) return null;
+  return [meta.width, meta.height, meta.bitDepth, meta.hasAlpha];
+}
 
 async function getAllFiles(dirPath, ignoreRegex, signal) {
   const results = [];
@@ -43,8 +51,8 @@ async function getAllFiles(dirPath, ignoreRegex, signal) {
 
 async function scanDirectory(db, dirPath, libraryId, ignoreRegex, signal) {
   const insertAsset = db.prepare(`
-    INSERT OR REPLACE INTO assets (library_id, file_path, file_name, file_ext, file_size, modified_date, created_date, category)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT OR REPLACE INTO assets (library_id, file_path, file_name, file_ext, file_size, modified_date, created_date, category, width, height, bit_depth, has_alpha)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const files = await getAllFiles(dirPath, ignoreRegex, signal);
@@ -54,6 +62,7 @@ async function scanDirectory(db, dirPath, libraryId, ignoreRegex, signal) {
         const stat = fs.statSync(filePath);
         const ext = path.extname(filePath);
         const category = getAssetCategory(ext);
+        const meta = metadataFor(filePath, category);
         insertAsset.run(
           libraryId,
           filePath,
@@ -62,7 +71,11 @@ async function scanDirectory(db, dirPath, libraryId, ignoreRegex, signal) {
           stat.size,
           stat.mtime.toISOString(),
           stat.birthtime.toISOString(),
-          category
+          category,
+          meta ? meta[0] : null,
+          meta ? meta[1] : null,
+          meta ? meta[2] : null,
+          meta ? meta[3] : null
         );
       } catch (e) {}
     }

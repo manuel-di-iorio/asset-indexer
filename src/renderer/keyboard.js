@@ -2,6 +2,7 @@ import { state } from './state.js';
 import { moveSelection, selectAll, selectFirst, selectLast, clearSelection } from './selection.js';
 import { hideContextMenu } from './context-menu.js';
 import { openSelectedInExplorer } from './bulk-actions.js';
+import { showRenameAssetModal } from './modals/rename-asset.js';
 
 function isTypingTarget(el) {
   if (!el) return false;
@@ -74,6 +75,12 @@ export function initKeyboardShortcuts() {
         if (ctxOpen || (active && active.tagName === 'BUTTON')) return;
         e.preventDefault();
         if (state.selectedAssetIds.length > 0) openSelectedInExplorer();
+        break;
+      }
+      case 'F2': {
+        if (ctxOpen) return;
+        e.preventDefault();
+        if (state.selectedAssetIds.length === 1) showRenameAssetModal();
         break;
       }
     }

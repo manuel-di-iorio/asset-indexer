@@ -3,11 +3,13 @@ import { escapeHtml, getCategoryFromExt } from '../utils.js';
 import { CATEGORY_ICONS, CATEGORY_COLORS, CATEGORY_LABELS } from '../constants.js';
 import { selectSingle, toggleSelect, rangeSelect } from '../selection.js';
 import { showAssetContextMenu } from '../context-menu.js';
+import { loadMoreAssets } from '../api.js';
 
 let thumbObserver = null;
 let thumbnailCache = {};
 let currentRenderId = 0;
 let thumbScrollHandler = null;
+let renderedCount = 0;
 
 function placeholderHTML(color, icon) {
   return `<div class="thumb-placeholder" style="color: ${color}">${icon}</div>`;
@@ -96,8 +98,59 @@ function setupThumbnailObserver() {
   grid.querySelectorAll('.card-thumbnail[data-thumb-path]').forEach(el => {
     thumbObserver.observe(el);
   });
-  thumbScrollHandler = () => loadThumbnailsForVisible();
+  thumbScrollHandler = () => {
+    loadThumbnailsForVisible();
+    maybeLoadMore();
+  };
   grid.addEventListener('scroll', thumbScrollHandler, { passive: true });
+}
+
+function maybeLoadMore() {
+  const grid = document.getElementById('asset-grid');
+  if (!grid || state.isLoading || !state.hasMore) return;
+  if (grid.scrollTop + grid.clientHeight >= grid.scrollHeight - 800) {
+    loadMoreAssets().then(() => {
+      appendMoreAssets();
+      maybeLoadMore();
+    });
+  }
+}
+
+function buildCard(asset, renderId) {
+  const temp = document.createElement('div');
+  temp.innerHTML = createCardHTML(asset);
+  const el = temp.firstElementChild;
+  if (state.selectedAssetIds.includes(asset.id)) el.classList.add('selected');
+  if (asset.id === state.focusedAssetId) el.classList.add('focused');
+  el.addEventListener('click', (e) => {
+    if (currentRenderId !== renderId) return;
+    if (e.shiftKey) {
+      rangeSelect(asset.id);
+    } else if (e.ctrlKey || e.metaKey) {
+      toggleSelect(asset.id);
+    } else {
+      selectSingle(asset.id);
+    }
+  });
+  el.addEventListener('contextmenu', (e) => {
+    if (currentRenderId !== renderId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (!state.selectedAssetIds.includes(asset.id)) {
+      selectSingle(asset.id);
+    }
+    showAssetContextMenu(e.clientX, e.clientY);
+  });
+  return el;
+}
+
+function appendCards(renderId) {
+  const grid = document.getElementById('asset-grid');
+  const frag = document.createDocumentFragment();
+  const slice = state.assets.slice(renderedCount);
+  slice.forEach(asset => frag.appendChild(buildCard(asset, renderId)));
+  renderedCount = state.assets.length;
+  grid.appendChild(frag);
 }
 
 export function renderAssets() {
@@ -108,44 +161,26 @@ export function renderAssets() {
   if (state.assets.length === 0) {
     grid.innerHTML = '';
     emptyState.style.display = 'flex';
+    renderedCount = 0;
     return;
   }
 
   emptyState.style.display = 'none';
-  const frag = document.createDocumentFragment();
-  const temp = document.createElement('div');
-
-  state.assets.forEach(asset => {
-    temp.innerHTML = createCardHTML(asset);
-    const el = temp.firstElementChild;
-    if (state.selectedAssetIds.includes(asset.id)) el.classList.add('selected');
-    if (asset.id === state.focusedAssetId) el.classList.add('focused');
-    el.addEventListener('click', (e) => {
-      if (currentRenderId !== renderId) return;
-      if (e.shiftKey) {
-        rangeSelect(asset.id);
-      } else if (e.ctrlKey || e.metaKey) {
-        toggleSelect(asset.id);
-      } else {
-        selectSingle(asset.id);
-      }
-    });
-    el.addEventListener('contextmenu', (e) => {
-      if (currentRenderId !== renderId) return;
-      e.preventDefault();
-      e.stopPropagation();
-      if (!state.selectedAssetIds.includes(asset.id)) {
-        selectSingle(asset.id);
-      }
-      showAssetContextMenu(e.clientX, e.clientY);
-    });
-    frag.appendChild(el);
-  });
-
   grid.innerHTML = '';
-  grid.appendChild(frag);
+  renderedCount = 0;
+  appendCards(renderId);
   grid.classList.toggle('list-view', state.viewMode === 'list');
 
+  loadThumbnailsForVisible();
+  setupThumbnailObserver();
+  maybeLoadMore();
+}
+
+export function appendMoreAssets() {
+  const grid = document.getElementById('asset-grid');
+  if (!grid || renderedCount >= state.assets.length) return;
+  const renderId = currentRenderId;
+  appendCards(renderId);
   loadThumbnailsForVisible();
   setupThumbnailObserver();
 }

@@ -157,6 +157,7 @@
                 <option value="name">Name</option>
                 <option value="size">Size</option>
                 <option value="modified">Modified</option>
+                <option value="created">Recently Added</option>
                 <option value="type">Type</option>
               </select>
             </div>
@@ -169,7 +170,7 @@
               </button>
             </div>
             <button class="view-btn active" id="btn-toggle-inspector" title="Toggle Inspector Panel">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/><rect x="14" y="16" width="7" height="5"/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="15" y1="3" x2="15" y2="21"/><rect x="16" y="8" width="4" height="8"/></svg>
             </button>
           </div>
         </div>
@@ -182,6 +183,7 @@
           <span class="bulk-count" id="bulk-count">0 selected</span>
           <div class="bulk-actions">
             <button class="bulk-btn" id="bulk-btn-tag" title="Add tag to all selected">Add Tag</button>
+            <button class="bulk-btn" id="bulk-btn-remove-tag" title="Remove tag from all selected">Remove Tag</button>
             <button class="bulk-btn" id="bulk-btn-collection" title="Add all selected to a collection">Collection</button>
             <button class="bulk-btn" id="bulk-btn-favorite" title="Toggle favorite for all selected">Favorite</button>
             <button class="bulk-btn" id="bulk-btn-copy" title="Copy all selected paths">Copy Paths</button>

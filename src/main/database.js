@@ -34,6 +34,10 @@ function initDatabase() {
       created_date DATETIME,
       category TEXT DEFAULT 'other',
       is_favorite INTEGER DEFAULT 0,
+      width INTEGER,
+      height INTEGER,
+      bit_depth INTEGER,
+      has_alpha INTEGER,
       FOREIGN KEY (library_id) REFERENCES libraries(id)
     );
 
@@ -98,9 +102,22 @@ function initDatabase() {
     `);
   }
 
-  const cols = db.prepare("PRAGMA table_info(libraries)").all();
-  if (!cols.find(c => c.name === 'ignore_regex')) {
+  const libCols = db.prepare("PRAGMA table_info(libraries)").all();
+  if (!libCols.find(c => c.name === 'ignore_regex')) {
     db.exec("ALTER TABLE libraries ADD COLUMN ignore_regex TEXT DEFAULT ''");
+  }
+
+  const assetCols = db.prepare("PRAGMA table_info(assets)").all();
+  const assetMigrations = {
+    width: 'ALTER TABLE assets ADD COLUMN width INTEGER',
+    height: 'ALTER TABLE assets ADD COLUMN height INTEGER',
+    bit_depth: 'ALTER TABLE assets ADD COLUMN bit_depth INTEGER',
+    has_alpha: 'ALTER TABLE assets ADD COLUMN has_alpha INTEGER'
+  };
+  for (const [name, ddl] of Object.entries(assetMigrations)) {
+    if (!assetCols.find(c => c.name === name)) {
+      db.exec(ddl);
+    }
   }
 }
 

@@ -2,8 +2,22 @@ const path = require('path');
 const fs = require('fs');
 const chokidar = require('chokidar');
 const { ALL_EXTENSIONS, getAssetCategory } = require('./constants');
+const { extractImageMetadata } = require('./metadata');
 
 let watchers = {};
+let ignoredPaths = new Set();
+
+function metadataFor(filePath, category) {
+  if (category !== 'images') return null;
+  const meta = extractImageMetadata(filePath);
+  if (!meta) return null;
+  return [meta.width, meta.height, meta.bitDepth, meta.hasAlpha];
+}
+
+function ignorePath(p) {
+  ignoredPaths.add(p);
+  setTimeout(() => ignoredPaths.delete(p), 5000);
+}
 
 function setupWatcher(db, mainWindow, libraryPath, libraryId, ignoreRegex) {
   if (watchers[libraryId]) {
@@ -32,29 +46,38 @@ function setupWatcher(db, mainWindow, libraryPath, libraryId, ignoreRegex) {
   });
 
   watcher.on('add', (filePath) => {
+    if (ignoredPaths.has(filePath)) return;
     const ext = path.extname(filePath).toLowerCase();
     if (!ALL_EXTENSIONS.includes(ext)) return;
     try {
       const stat = fs.statSync(filePath);
       const category = getAssetCategory(ext);
+      const meta = metadataFor(filePath, category);
       db.prepare(`
-        INSERT OR REPLACE INTO assets (library_id, file_path, file_name, file_ext, file_size, modified_date, created_date, category)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(libraryId, filePath, path.basename(filePath), ext, stat.size, stat.mtime.toISOString(), stat.birthtime.toISOString(), category);
+        INSERT OR REPLACE INTO assets (library_id, file_path, file_name, file_ext, file_size, modified_date, created_date, category, width, height, bit_depth, has_alpha)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(libraryId, filePath, path.basename(filePath), ext, stat.size, stat.mtime.toISOString(), stat.birthtime.toISOString(), category,
+        meta ? meta[0] : null, meta ? meta[1] : null, meta ? meta[2] : null, meta ? meta[3] : null);
       mainWindow?.webContents.send('asset-added', { libraryId, filePath });
     } catch (e) {}
   });
 
   watcher.on('change', (filePath) => {
+    if (ignoredPaths.has(filePath)) return;
     try {
       const stat = fs.statSync(filePath);
-      db.prepare(`UPDATE assets SET file_size = ?, modified_date = ? WHERE file_path = ?`)
-        .run(stat.size, stat.mtime.toISOString(), filePath);
+      const category = getAssetCategory(path.extname(filePath).toLowerCase());
+      const meta = metadataFor(filePath, category);
+      db.prepare(`UPDATE assets SET file_size = ?, modified_date = ?, width = ?, height = ?, bit_depth = ?, has_alpha = ? WHERE file_path = ?`)
+        .run(stat.size, stat.mtime.toISOString(),
+          meta ? meta[0] : null, meta ? meta[1] : null, meta ? meta[2] : null, meta ? meta[3] : null,
+          filePath);
       mainWindow?.webContents.send('asset-updated', { filePath });
     } catch (e) {}
   });
 
   watcher.on('unlink', (filePath) => {
+    if (ignoredPaths.has(filePath)) return;
     db.prepare(`DELETE FROM assets WHERE file_path = ?`).run(filePath);
     mainWindow?.webContents.send('asset-removed', { filePath });
   });
@@ -74,4 +97,4 @@ function stopAllWatchers() {
   watchers = {};
 }
 
-module.exports = { setupWatcher, stopWatcher, stopAllWatchers };
+module.exports = { setupWatcher, stopWatcher, stopAllWatchers, ignorePath };

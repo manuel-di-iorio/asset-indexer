@@ -505,6 +505,8 @@ html, body {
 .bulk-actions {
   display: flex;
   gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .bulk-btn {
@@ -1166,6 +1168,15 @@ html, body {
 
 .modal-footer .btn-primary:hover {
   background: var(--accent-hover);
+}
+
+.modal-footer .btn-danger {
+  background: var(--red);
+  color: white;
+}
+
+.modal-footer .btn-danger:hover {
+  background: #dc2626;
 }
 
 /* Content Info */

@@ -15,5 +15,7 @@ export const state = {
   tags: [],
   collections: [],
   assets: [],
-  totalCount: 0
+  totalCount: 0,
+  hasMore: false,
+  isLoading: false
 };

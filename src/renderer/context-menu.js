@@ -3,6 +3,7 @@ import { state } from './state.js';
 import { loadLibraries, loadAssets, loadTags, loadCollections, loadCategoryCounts } from './api.js';
 import { showAddTagToAssetModal } from './modals/add-tag-to-asset.js';
 import { showAddToCollectionModal } from './modals/add-to-collection.js';
+import { showRemoveTagFromAssetsModal } from './modals/remove-tag-from-assets.js';
 import { toggleFavoriteSelected, copySelectedPaths, openSelectedInExplorer } from './bulk-actions.js';
 
 let contextMenuTarget = null;
@@ -72,6 +73,8 @@ async function handleContextAction(action) {
     }
   } else if (action === 'tag-selected') {
     showAddTagToAssetModal();
+  } else if (action === 'remove-tag-selected') {
+    showRemoveTagFromAssetsModal();
   } else if (action === 'collection-selected') {
     showAddToCollectionModal();
   } else if (action === 'favorite-selected') {
@@ -95,6 +98,7 @@ export function showAssetContextMenu(x, y) {
   const n = state.selectedAssetIds.length;
   showContextMenu(x, y, [
     { label: `Add Tag (${n})`, icon: ASSET_MENU_ICONS.tag, action: 'tag-selected' },
+    { label: `Remove Tag (${n})`, icon: ASSET_MENU_ICONS.tag, action: 'remove-tag-selected' },
     { label: `Add to Collection (${n})`, icon: ASSET_MENU_ICONS.folder, action: 'collection-selected' },
     { type: 'separator' },
     { label: 'Toggle Favorite', icon: ASSET_MENU_ICONS.favorite, action: 'favorite-selected' },
