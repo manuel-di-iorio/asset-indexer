@@ -78,6 +78,7 @@ async function handleContextAction(action) {
     }
   } else if (action === 'rename' && type === 'collection') {
     showRenameCollectionModal(target);
+  } else if (action === 'tag-selected') {
     showAddTagToAssetModal();
   } else if (action === 'remove-tag-selected') {
     showRemoveTagFromAssetsModal();
