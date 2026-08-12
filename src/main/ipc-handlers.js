@@ -5,6 +5,7 @@ const { ipcMain, dialog, shell, nativeImage } = require('electron');
 const { getAssetCategory } = require('./constants');
 const { scanDirectory, pruneStaleAssets } = require('./scanner');
 const { setupWatcher, stopWatcher, ignorePath } = require('./watchers');
+const { detectLicense } = require('./license');
 
 const THUMB_CACHE_DIR = null;
 
@@ -284,7 +285,7 @@ function registerIpcHandlers(db, getMainWindow, app) {
   });
 
   ipcMain.handle('get-asset', (event, assetId) => {
-    return db.prepare(`
+    const asset = db.prepare(`
       SELECT a.*,
         GROUP_CONCAT(DISTINCT t.name) as tags,
         GROUP_CONCAT(DISTINCT t.color) as tag_colors,
@@ -297,6 +298,19 @@ function registerIpcHandlers(db, getMainWindow, app) {
       WHERE a.id = ?
       GROUP BY a.id
     `).get(assetId);
+    if (!asset) return null;
+
+    if (!asset.license) {
+      const lib = asset.library_id
+        ? db.prepare('SELECT path FROM libraries WHERE id = ?').get(asset.library_id)
+        : null;
+      const detected = detectLicense(asset, lib ? lib.path : null);
+      if (detected) {
+        db.prepare('UPDATE assets SET license = ? WHERE id = ?').run(detected.license, assetId);
+        asset.license = detected.license;
+      }
+    }
+    return asset;
   });
 
   ipcMain.handle('toggle-favorite', (event, assetId) => {
@@ -324,6 +338,17 @@ function registerIpcHandlers(db, getMainWindow, app) {
     db.prepare('DELETE FROM asset_tags WHERE tag_id = ?').run(tagId);
     db.prepare('DELETE FROM tags WHERE id = ?').run(tagId);
     return true;
+  });
+
+  ipcMain.handle('rename-tag', (event, tagId, name, color) => {
+    if (!name || !name.trim()) return { error: 'Name cannot be empty' };
+    try {
+      db.prepare('UPDATE tags SET name = ?, color = ? WHERE id = ?')
+        .run(name.trim(), color || '#7c3aed', tagId);
+      return true;
+    } catch (e) {
+      return { error: 'Tag already exists' };
+    }
   });
 
   ipcMain.handle('add-tag-to-asset', (event, assetId, tagId) => {
@@ -394,6 +419,28 @@ function registerIpcHandlers(db, getMainWindow, app) {
   ipcMain.handle('delete-collection', (event, collectionId) => {
     db.prepare('DELETE FROM asset_collections WHERE collection_id = ?').run(collectionId);
     db.prepare('DELETE FROM collections WHERE id = ?').run(collectionId);
+    return true;
+  });
+
+  ipcMain.handle('rename-collection', (event, collectionId, name, description) => {
+    if (!name || !name.trim()) return { error: 'Name cannot be empty' };
+    try {
+      db.prepare('UPDATE collections SET name = ?, description = ? WHERE id = ?')
+        .run(name.trim(), description || '', collectionId);
+      return true;
+    } catch (e) {
+      return { error: 'Collection already exists' };
+    }
+  });
+
+  ipcMain.handle('update-asset-metadata', (event, assetId, fields) => {
+    const updates = [];
+    const values = [];
+    if (typeof fields?.license === 'string') { updates.push('license = ?'); values.push(fields.license); }
+    if (typeof fields?.notes === 'string') { updates.push('notes = ?'); values.push(fields.notes); }
+    if (updates.length === 0) return false;
+    values.push(assetId);
+    db.prepare(`UPDATE assets SET ${updates.join(', ')} WHERE id = ?`).run(...values);
     return true;
   });
 

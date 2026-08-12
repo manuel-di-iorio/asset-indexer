@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('api', {
   getTags: () => ipcRenderer.invoke('get-tags'),
   addTag: (name, color) => ipcRenderer.invoke('add-tag', name, color),
   deleteTag: (id) => ipcRenderer.invoke('delete-tag', id),
+  renameTag: (id, name, color) => ipcRenderer.invoke('rename-tag', id, name, color),
   addTagToAsset: (assetId, tagId) => ipcRenderer.invoke('add-tag-to-asset', assetId, tagId),
   removeTagFromAsset: (assetId, tagId) => ipcRenderer.invoke('remove-tag-from-asset', assetId, tagId),
   removeTagFromAssets: (assetIds, tagId) => ipcRenderer.invoke('remove-tag-from-assets', assetIds, tagId),
@@ -27,9 +28,12 @@ contextBridge.exposeInMainWorld('api', {
   getCollections: () => ipcRenderer.invoke('get-collections'),
   addCollection: (name, desc) => ipcRenderer.invoke('add-collection', name, desc),
   deleteCollection: (id) => ipcRenderer.invoke('delete-collection', id),
+  renameCollection: (id, name, desc) => ipcRenderer.invoke('rename-collection', id, name, desc),
   addAssetToCollection: (assetId, collectionId) => ipcRenderer.invoke('add-asset-to-collection', assetId, collectionId),
   removeAssetFromCollection: (assetId, collectionId) => ipcRenderer.invoke('remove-asset-from-collection', assetId, collectionId),
   removeAssetFromCollections: (assetIds, collectionId) => ipcRenderer.invoke('remove-asset-from-collections', assetIds, collectionId),
+
+  updateAssetMetadata: (assetId, fields) => ipcRenderer.invoke('update-asset-metadata', assetId, fields),
 
   getCategoryCounts: () => ipcRenderer.invoke('get-category-counts'),
   getTotalAssets: () => ipcRenderer.invoke('get-total-assets'),

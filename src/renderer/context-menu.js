@@ -5,6 +5,8 @@ import { showAddTagToAssetModal } from './modals/add-tag-to-asset.js';
 import { showAddToCollectionModal } from './modals/add-to-collection.js';
 import { showRemoveTagFromAssetsModal } from './modals/remove-tag-from-assets.js';
 import { showRemoveFromCollectionModal } from './modals/remove-from-collection.js';
+import { showRenameTagModal } from './modals/rename-tag.js';
+import { showRenameCollectionModal } from './modals/rename-collection.js';
 import { toggleFavoriteSelected, copySelectedPaths, openSelectedInExplorer } from './bulk-actions.js';
 
 let contextMenuTarget = null;
@@ -64,6 +66,8 @@ async function handleContextAction(action) {
       await loadAssets();
       document.dispatchEvent(new CustomEvent('breadcrumb-update'));
     }
+  } else if (action === 'rename' && type === 'tag') {
+    showRenameTagModal(target);
   } else if (action === 'delete' && type === 'collection') {
     if (confirm('Delete this collection?')) {
       await window.api.deleteCollection(target);
@@ -72,7 +76,8 @@ async function handleContextAction(action) {
       await loadAssets();
       document.dispatchEvent(new CustomEvent('breadcrumb-update'));
     }
-  } else if (action === 'tag-selected') {
+  } else if (action === 'rename' && type === 'collection') {
+    showRenameCollectionModal(target);
     showAddTagToAssetModal();
   } else if (action === 'remove-tag-selected') {
     showRemoveTagFromAssetsModal();

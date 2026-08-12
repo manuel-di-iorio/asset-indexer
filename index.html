@@ -257,6 +257,43 @@
             <div class="tag-chips" id="inspector-collection-chips"></div>
           </div>
 
+          <div class="inspector-usage" id="inspector-usage">
+            <div class="inspector-tags-header">
+              <span>USAGE</span>
+            </div>
+            <div class="usage-field">
+              <label class="usage-label" for="usage-license-input">License</label>
+              <input type="text" id="usage-license-input" list="license-presets" placeholder="License..." autocomplete="off">
+              <datalist id="license-presets">
+                <option value="MIT">
+                <option value="MIT-0">
+                <option value="Apache-2.0">
+                <option value="BSD-3-Clause">
+                <option value="BSD-2-Clause">
+                <option value="GPL-3.0">
+                <option value="GPL-2.0">
+                <option value="LGPL-3.0">
+                <option value="ISC">
+                <option value="zlib">
+                <option value="Unlicense">
+                <option value="CC0">
+                <option value="CC BY">
+                <option value="CC BY-SA">
+                <option value="CC BY-NC">
+                <option value="CC BY-NC-SA">
+                <option value="CC BY-ND">
+                <option value="Royalty Free">
+                <option value="Commercial">
+                <option value="Proprietary">
+                <option value="All Rights Reserved">
+              </datalist>
+            </div>
+            <div class="usage-field">
+              <label class="usage-label" for="usage-notes-input">Notes</label>
+              <textarea id="usage-notes-input" rows="4" placeholder="Notes about this asset (projects you can use it in, etc.)"></textarea>
+            </div>
+          </div>
+
           <div class="inspector-actions">
             <button class="secondary-btn" id="btn-open-external">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>

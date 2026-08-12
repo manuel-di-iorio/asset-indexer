@@ -36,6 +36,9 @@ function textureResolution(maxDim) {
 }
 
 export async function selectAsset(assetId) {
+  flushUsageSave();
+  usageLicenseInput().value = '';
+  usageNotesInput().value = '';
   const asset = await window.api.getAsset(assetId);
   if (!asset) return;
 
@@ -53,6 +56,7 @@ export async function selectAsset(assetId) {
   renderAssetDetails(asset);
   renderAssetTags(asset);
   renderAssetCollections(asset);
+  renderUsage(asset);
   const previewResult = await loadPreview(asset);
   if (previewResult?.width && previewResult?.height) {
     renderImageDimensions(previewResult.width, previewResult.height);
@@ -60,12 +64,14 @@ export async function selectAsset(assetId) {
 }
 
 export function clearInspector() {
+  flushUsageSave();
   state.selectedAsset = null;
   document.getElementById('inspector-empty').style.display = 'flex';
   document.getElementById('inspector-content').style.display = 'none';
 }
 
 export function showMultiSelection(count) {
+  flushUsageSave();
   state.selectedAsset = null;
   document.getElementById('inspector-empty').style.display = 'none';
   document.getElementById('inspector-content').style.display = 'flex';
@@ -85,6 +91,7 @@ export function showMultiSelection(count) {
 
   document.getElementById('inspector-tag-chips').innerHTML = '';
   document.getElementById('inspector-collection-chips').innerHTML = '';
+  hideUsage();
 
   const favBtn = document.getElementById('inspector-fav-btn');
   const selected = state.assets.filter(a => state.selectedAssetIds.includes(a.id));
@@ -140,6 +147,57 @@ function renderImageDimensions(width, height) {
   if (container.innerHTML.includes('Dimensions')) return;
   const ratio = ratioString(width, height);
   container.innerHTML += detailRow('Dimensions', `${width}×${height}px${ratio ? ` (${ratio})` : ''}`);
+}
+
+const usageLicenseInput = () => document.getElementById('usage-license-input');
+const usageNotesInput = () => document.getElementById('usage-notes-input');
+
+let usageSaveTimer = null;
+let usagePending = null;
+
+function scheduleUsageSave() {
+  const assetId = state.selectedAsset ? state.selectedAsset.id : null;
+  if (!assetId) return;
+  usagePending = {
+    assetId,
+    license: usageLicenseInput().value.trim(),
+    notes: usageNotesInput().value
+  };
+  clearTimeout(usageSaveTimer);
+  usageSaveTimer = setTimeout(flushUsageSave, 600);
+}
+
+function flushUsageSave() {
+  if (usageSaveTimer) { clearTimeout(usageSaveTimer); usageSaveTimer = null; }
+  if (!usagePending) return;
+  const pending = usagePending;
+  usagePending = null;
+  window.api.updateAssetMetadata(pending.assetId, { license: pending.license, notes: pending.notes });
+  const cur = state.selectedAsset;
+  if (cur && cur.id === pending.assetId) { cur.license = pending.license; cur.notes = pending.notes; }
+}
+
+function renderUsage(asset) {
+  document.getElementById('inspector-usage').style.display = 'block';
+  usageLicenseInput().value = asset.license || '';
+  usageNotesInput().value = asset.notes || '';
+}
+
+function hideUsage() {
+  document.getElementById('inspector-usage').style.display = 'none';
+  usageLicenseInput().value = '';
+  usageNotesInput().value = '';
+}
+
+const licenseInputEl = usageLicenseInput();
+const notesInputEl = usageNotesInput();
+if (licenseInputEl) {
+  licenseInputEl.addEventListener('input', scheduleUsageSave);
+  licenseInputEl.addEventListener('blur', flushUsageSave);
+}
+if (notesInputEl) {
+  notesInputEl.addEventListener('input', scheduleUsageSave);
+  notesInputEl.addEventListener('blur', flushUsageSave);
 }
 
 export function renderAssetTags(asset) {

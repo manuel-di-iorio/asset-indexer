@@ -1,6 +1,6 @@
 {
   "name": "asset-indexer",
-  "version": "1.3",
+  "version": "1.4.0",
   "description": "Intelligent asset indexer for game developers",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -35,14 +35,16 @@
     },
     "win": {
       "icon": "src/renderer/icon.ico",
-      "target": ["nsis", "portable"],
+      "target": ["nsis", "zip"],
+      "artifactName": "win-portable.${ext}",
       "signAndEditExecutable": false,
       "verifyUpdateCodeSignature": false,
       "forceCodeSigning": false
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "win-setup.${ext}"
     }
   }
 }

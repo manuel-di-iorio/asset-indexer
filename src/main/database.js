@@ -38,6 +38,8 @@ function initDatabase() {
       height INTEGER,
       bit_depth INTEGER,
       has_alpha INTEGER,
+      license TEXT DEFAULT '',
+      notes TEXT DEFAULT '',
       FOREIGN KEY (library_id) REFERENCES libraries(id)
     );
 
@@ -112,7 +114,9 @@ function initDatabase() {
     width: 'ALTER TABLE assets ADD COLUMN width INTEGER',
     height: 'ALTER TABLE assets ADD COLUMN height INTEGER',
     bit_depth: 'ALTER TABLE assets ADD COLUMN bit_depth INTEGER',
-    has_alpha: 'ALTER TABLE assets ADD COLUMN has_alpha INTEGER'
+    has_alpha: 'ALTER TABLE assets ADD COLUMN has_alpha INTEGER',
+    license: "ALTER TABLE assets ADD COLUMN license TEXT DEFAULT ''",
+    notes: "ALTER TABLE assets ADD COLUMN notes TEXT DEFAULT ''"
   };
   for (const [name, ddl] of Object.entries(assetMigrations)) {
     if (!assetCols.find(c => c.name === name)) {
