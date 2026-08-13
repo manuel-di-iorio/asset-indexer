@@ -7,6 +7,7 @@ import { hideContextMenu } from './context-menu.js';
 import { syncSelection, clearSelection, removeSelectedId } from './selection.js';
 import { toggleFavoriteSelected, copySelectedPaths, openSelectedInExplorer } from './bulk-actions.js';
 import { initKeyboardShortcuts } from './keyboard.js';
+import { consumeRubberSelect } from './rubber-band.js';
 import { showAddLibraryModal } from './modals/add-library.js';
 import { showAddTagModal } from './modals/add-tag.js';
 import { showAddTagToAssetModal } from './modals/add-tag-to-asset.js';
@@ -44,7 +45,7 @@ export function initEventListeners() {
   document.addEventListener('click', hideContextMenu);
 
   document.getElementById('asset-grid').addEventListener('click', (e) => {
-    if (e.target === e.currentTarget) clearSelection();
+    if (e.target === e.currentTarget && !consumeRubberSelect()) clearSelection();
   });
 
   document.getElementById('bulk-btn-tag').addEventListener('click', showAddTagToAssetModal);

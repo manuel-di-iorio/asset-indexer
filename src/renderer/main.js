@@ -5,6 +5,7 @@ import { renderSources, renderTags, renderCollections } from './render/sidebar.j
 import { updateBreadcrumb, updateSidebarActive } from './render/breadcrumb.js';
 import { initEventListeners } from './events.js';
 import { initResizeHandles } from './resize.js';
+import { initRubberBand } from './rubber-band.js';
 import { initTheme } from './theme.js';
 import { version } from '../../package.json';
 
@@ -17,6 +18,7 @@ async function init() {
   setTimeout(hideSplash, 8000);
   initTheme();
   initResizeHandles();
+  initRubberBand();
   document.getElementById('status-version').textContent = `v${version}`;
   initEventListeners();
   await loadLibraries();
