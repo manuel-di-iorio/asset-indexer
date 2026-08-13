@@ -28,6 +28,7 @@
   --cyan: #06b6d4;
   --pink: #ec4899;
   --orange: #f97316;
+  --bg-bulk: rgba(20, 24, 41, 0.92);
   --sidebar-width: 240px;
   --inspector-width: 360px;
   --titlebar-height: 48px;
@@ -41,6 +42,29 @@
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
   --transition: 150ms ease;
+}
+
+[data-theme="light"] {
+  --bg-primary: #f3f4f8;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #eceef4;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f2f3f9;
+  --bg-selected: #f0e7ff;
+  --bg-input: #f6f7fb;
+  --border-color: rgba(15, 23, 42, 0.08);
+  --border-hover: rgba(15, 23, 42, 0.18);
+  --text-primary: #171a26;
+  --text-secondary: #4b5165;
+  --text-muted: #9aa1b8;
+  --accent: #6d28d9;
+  --accent-hover: #7c3aed;
+  --accent-glow: rgba(109, 40, 217, 0.22);
+  --accent-subtle: rgba(109, 40, 217, 0.07);
+  --bg-bulk: rgba(255, 255, 255, 0.95);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.1);
+  --shadow-lg: 0 8px 32px rgba(15, 23, 42, 0.14);
 }
 
 html, body {
@@ -155,6 +179,43 @@ html, body {
   display: flex;
   flex: 1;
   overflow: hidden;
+}
+
+/* Resize handles */
+.resize-handle {
+  width: 5px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: transparent;
+  position: relative;
+  z-index: 5;
+  transition: background 150ms ease;
+}
+
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  width: 1px;
+  background: var(--border-color);
+  transition: background 150ms ease;
+}
+
+.resize-handle:hover::after,
+.resize-handle.dragging::after {
+  background: var(--accent);
+}
+
+.resize-handle:hover {
+  background: var(--accent-subtle);
+}
+
+body.resizing,
+body.resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 /* Sidebar */
@@ -488,7 +549,7 @@ html, body {
   justify-content: space-between;
   gap: 12px;
   padding: 8px 14px;
-  background: rgba(20, 24, 41, 0.92);
+  background: var(--bg-bulk);
   border: 1px solid var(--accent);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
@@ -1057,6 +1118,10 @@ html, body {
   box-shadow: var(--shadow-lg);
 }
 
+.modal.wide {
+  width: 500px;
+}
+
 .modal-header {
   display: flex;
   align-items: center;
@@ -1206,20 +1271,16 @@ html, body {
 
 /* Responsive */
 @media (max-width: 1200px) {
-  .inspector {
-    width: 300px;
-  }
-  .sidebar {
-    width: 220px;
+  :root {
+    --inspector-width: 300px;
+    --sidebar-width: 220px;
   }
 }
 
 @media (max-width: 1060px) {
-  .inspector {
-    width: 260px;
-  }
-  .sidebar {
-    width: 200px;
+  :root {
+    --inspector-width: 260px;
+    --sidebar-width: 200px;
   }
 }
 
@@ -1646,4 +1707,74 @@ button, select, input {
 /* Prevent text selection on non-text elements */
 .sidebar-item, .view-btn, .control-btn {
   user-select: none;
+}
+
+/* Settings modal */
+.settings-section {
+  margin-bottom: 18px;
+}
+
+.settings-section:last-of-type {
+  margin-bottom: 0;
+}
+
+.settings-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.settings-select {
+  width: 100%;
+  padding: 8px 28px 8px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%238b8fa8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+.settings-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.settings-btn {
+  width: 100%;
+  margin-bottom: 8px;
+  justify-content: flex-start;
+}
+
+.settings-btn:last-of-type {
+  margin-bottom: 0;
+}
+
+.settings-status {
+  min-height: 18px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+  font-size: 11.5px;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+/* Usage multi-select hint */
+.usage-multi-hint {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent-glow);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  color: var(--text-secondary);
 }

@@ -6,12 +6,12 @@ let assetsToken = 0;
 
 function buildParams(offset, limit) {
   return {
-    category: state.currentCategory === 'favorites' ? 'all' : state.currentCategory,
+    categories: state.selectedCategories,
     search: state.searchQuery,
     sort: state.sortBy,
     favorites: state.favorites,
-    collectionId: state.collectionId,
-    tagId: state.tagId,
+    collectionIds: state.collectionIds,
+    tagIds: state.tagIds,
     libraryIds: state.libraryIds,
     limit,
     offset

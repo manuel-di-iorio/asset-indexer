@@ -1,10 +1,11 @@
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { ipcMain, dialog, shell, nativeImage } = require('electron');
+const { ipcMain, dialog, shell, nativeImage, app } = require('electron');
+const Database = require('better-sqlite3');
 const { getAssetCategory } = require('./constants');
 const { scanDirectory, pruneStaleAssets } = require('./scanner');
-const { setupWatcher, stopWatcher, ignorePath } = require('./watchers');
+const { setupWatcher, stopWatcher, ignorePath, stopAllWatchers } = require('./watchers');
 const { detectLicense } = require('./license');
 
 const THUMB_CACHE_DIR = null;
@@ -189,15 +190,16 @@ function registerIpcHandlers(db, getMainWindow, app) {
     LEFT JOIN asset_collections ac ON a.id = ac.asset_id
     LEFT JOIN collections c ON ac.collection_id = c.id`;
     const conditions = [];
+    const filterConds = [];
     const values = [];
 
     if (params.libraryIds && params.libraryIds.length > 0) {
-      conditions.push(`a.library_id IN (${params.libraryIds.map(() => '?').join(',')})`);
+      filterConds.push(`a.library_id IN (${params.libraryIds.map(() => '?').join(',')})`);
       values.push(...params.libraryIds);
     }
-    if (params.category && params.category !== 'all') {
-      conditions.push('a.category = ?');
-      values.push(params.category);
+    if (params.categories && params.categories.length > 0) {
+      filterConds.push(`a.category IN (${params.categories.map(() => '?').join(',')})`);
+      values.push(...params.categories);
     }
     if (params.search) {
       conditions.push('a.file_name LIKE ?');
@@ -206,14 +208,19 @@ function registerIpcHandlers(db, getMainWindow, app) {
     if (params.favorites) {
       conditions.push('a.is_favorite = 1');
     }
-    if (params.collectionId) {
-      conditions.push('a.id IN (SELECT asset_id FROM asset_collections WHERE collection_id = ?)');
-      values.push(params.collectionId);
+    if (params.collectionIds && params.collectionIds.length > 0) {
+      filterConds.push(`a.id IN (
+        SELECT DISTINCT asset_id FROM asset_collections WHERE collection_id IN (${params.collectionIds.map(() => '?').join(',')})
+      )`);
+      values.push(...params.collectionIds);
     }
-    if (params.tagId) {
-      conditions.push('a.id IN (SELECT asset_id FROM asset_tags WHERE tag_id = ?)');
-      values.push(params.tagId);
+    if (params.tagIds && params.tagIds.length > 0) {
+      filterConds.push(`a.id IN (
+        SELECT DISTINCT asset_id FROM asset_tags WHERE tag_id IN (${params.tagIds.map(() => '?').join(',')})
+      )`);
+      values.push(...params.tagIds);
     }
+    if (filterConds.length > 0) conditions.push('(' + filterConds.join(' OR ') + ')');
 
     if (conditions.length > 0) {
       query += ' WHERE ' + conditions.join(' AND ');
@@ -251,15 +258,16 @@ function registerIpcHandlers(db, getMainWindow, app) {
   ipcMain.handle('get-asset-count', (event, params) => {
     let query = 'SELECT COUNT(*) as count FROM assets a';
     const conditions = [];
+    const filterConds = [];
     const values = [];
 
     if (params.libraryIds && params.libraryIds.length > 0) {
-      conditions.push(`a.library_id IN (${params.libraryIds.map(() => '?').join(',')})`);
+      filterConds.push(`a.library_id IN (${params.libraryIds.map(() => '?').join(',')})`);
       values.push(...params.libraryIds);
     }
-    if (params.category && params.category !== 'all') {
-      conditions.push('a.category = ?');
-      values.push(params.category);
+    if (params.categories && params.categories.length > 0) {
+      filterConds.push(`a.category IN (${params.categories.map(() => '?').join(',')})`);
+      values.push(...params.categories);
     }
     if (params.search) {
       conditions.push('a.file_name LIKE ?');
@@ -268,14 +276,19 @@ function registerIpcHandlers(db, getMainWindow, app) {
     if (params.favorites) {
       conditions.push('a.is_favorite = 1');
     }
-    if (params.collectionId) {
-      conditions.push('a.id IN (SELECT asset_id FROM asset_collections WHERE collection_id = ?)');
-      values.push(params.collectionId);
+    if (params.collectionIds && params.collectionIds.length > 0) {
+      filterConds.push(`a.id IN (
+        SELECT DISTINCT asset_id FROM asset_collections WHERE collection_id IN (${params.collectionIds.map(() => '?').join(',')})
+      )`);
+      values.push(...params.collectionIds);
     }
-    if (params.tagId) {
-      conditions.push('a.id IN (SELECT asset_id FROM asset_tags WHERE tag_id = ?)');
-      values.push(params.tagId);
+    if (params.tagIds && params.tagIds.length > 0) {
+      filterConds.push(`a.id IN (
+        SELECT DISTINCT asset_id FROM asset_tags WHERE tag_id IN (${params.tagIds.map(() => '?').join(',')})
+      )`);
+      values.push(...params.tagIds);
     }
+    if (filterConds.length > 0) conditions.push('(' + filterConds.join(' OR ') + ')');
 
     if (conditions.length > 0) {
       query += ' WHERE ' + conditions.join(' AND ');
@@ -444,6 +457,20 @@ function registerIpcHandlers(db, getMainWindow, app) {
     return true;
   });
 
+  ipcMain.handle('update-assets-metadata', (event, assetIds, fields) => {
+    const updates = [];
+    const values = [];
+    if (typeof fields?.license === 'string') { updates.push('license = ?'); values.push(fields.license); }
+    if (typeof fields?.notes === 'string') { updates.push('notes = ?'); values.push(fields.notes); }
+    if (updates.length === 0 || !Array.isArray(assetIds) || assetIds.length === 0) return false;
+    const stmt = db.prepare(`UPDATE assets SET ${updates.join(', ')} WHERE id = ?`);
+    const tx = db.transaction((ids) => {
+      for (const id of ids) stmt.run(...values, id);
+    });
+    tx(assetIds);
+    return true;
+  });
+
   ipcMain.handle('add-asset-to-collection', (event, assetId, collectionId) => {
     try {
       db.prepare('INSERT OR IGNORE INTO asset_collections (asset_id, collection_id) VALUES (?, ?)').run(assetId, collectionId);
@@ -572,6 +599,68 @@ function registerIpcHandlers(db, getMainWindow, app) {
       } catch (e) {}
     }
     return results;
+  });
+
+  ipcMain.handle('export-database', async () => {
+    const mainWindow = getMainWindow();
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Export Database',
+      defaultPath: `asset-indexer-${stamp}.db`,
+      filters: [{ name: 'SQLite Database', extensions: ['db'] }]
+    });
+    if (result.canceled || !result.filePath) return null;
+    try {
+      await db.backup(result.filePath);
+      return { ok: true, path: result.filePath };
+    } catch (e) {
+      return { error: e.message };
+    }
+  });
+
+  ipcMain.handle('import-database', async () => {
+    const mainWindow = getMainWindow();
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Import Database',
+      filters: [{ name: 'SQLite Database', extensions: ['db'] }],
+      properties: ['openFile']
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    const srcPath = result.filePaths[0];
+
+    let probe;
+    try {
+      probe = new Database(srcPath, { readonly: true });
+      const tables = probe.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('libraries','assets')").all();
+      if (tables.length < 2) {
+        probe.close();
+        return { error: 'The selected file is not a valid Asset Indexer database.' };
+      }
+      probe.close();
+    } catch (e) {
+      if (probe) probe.close();
+      return { error: 'Could not open the selected database file.' };
+    }
+
+    try {
+      stopAllWatchers();
+      db.close();
+      const dbPath = path.join(app.getPath('userData'), 'assets.db');
+      for (const suffix of ['-wal', '-shm', '-journal']) {
+        try { fs.unlinkSync(dbPath + suffix); } catch (e) {}
+      }
+      fs.copyFileSync(srcPath, dbPath);
+      app.relaunch();
+      app.exit(0);
+      return { ok: true };
+    } catch (e) {
+      return { error: e.message };
+    }
+  });
+
+  ipcMain.handle('open-data-folder', () => {
+    const dbPath = path.join(app.getPath('userData'), 'assets.db');
+    shell.showItemInFolder(dbPath);
   });
 
   ipcMain.handle('window-minimize', () => getMainWindow()?.minimize());

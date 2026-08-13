@@ -1,5 +1,5 @@
 export const state = {
-  currentCategory: 'all',
+  selectedCategories: [],
   searchQuery: '',
   sortBy: 'name',
   viewMode: 'grid',
@@ -8,8 +8,8 @@ export const state = {
   selectedAssetIds: [],
   focusedAssetId: null,
   favorites: false,
-  collectionId: null,
-  tagId: null,
+  collectionIds: [],
+  tagIds: [],
   libraryIds: [],
   libraries: [],
   tags: [],

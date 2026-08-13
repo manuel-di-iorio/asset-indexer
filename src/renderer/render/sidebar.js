@@ -49,7 +49,7 @@ export function renderSources() {
 export function renderTags() {
   const container = document.getElementById('tags-list');
   container.innerHTML = state.tags.map(tag => `
-    <div class="sidebar-item ${state.tagId === tag.id ? 'active' : ''}" data-tag-id="${tag.id}">
+    <div class="sidebar-item ${state.tagIds.includes(tag.id) ? 'active' : ''}" data-tag-id="${tag.id}">
       <div class="tag-dot" style="background: ${tag.color}"></div>
       <span class="item-name">${escapeHtml(tag.name)}</span>
       <span class="item-count">${tag.asset_count || 0}</span>
@@ -59,7 +59,12 @@ export function renderTags() {
   container.querySelectorAll('.sidebar-item').forEach(item => {
     item.addEventListener('click', () => {
       const tagId = parseInt(item.dataset.tagId);
-      state.tagId = state.tagId === tagId ? null : tagId;
+      const idx = state.tagIds.indexOf(tagId);
+      if (idx >= 0) {
+        state.tagIds.splice(idx, 1);
+      } else {
+        state.tagIds.push(tagId);
+      }
       document.dispatchEvent(new CustomEvent('sidebar-update'));
     });
     item.addEventListener('contextmenu', (e) => {
@@ -77,7 +82,7 @@ export function renderTags() {
 export function renderCollections() {
   const container = document.getElementById('collections-list');
   container.innerHTML = state.collections.map(col => `
-    <div class="sidebar-item ${state.collectionId === col.id ? 'active' : ''}" data-collection-id="${col.id}">
+    <div class="sidebar-item ${state.collectionIds.includes(col.id) ? 'active' : ''}" data-collection-id="${col.id}">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
       <span class="item-name">${escapeHtml(col.name)}</span>
       <span class="item-count">${col.asset_count || 0}</span>
@@ -87,7 +92,12 @@ export function renderCollections() {
   container.querySelectorAll('.sidebar-item').forEach(item => {
     item.addEventListener('click', () => {
       const colId = parseInt(item.dataset.collectionId);
-      state.collectionId = state.collectionId === colId ? null : colId;
+      const idx = state.collectionIds.indexOf(colId);
+      if (idx >= 0) {
+        state.collectionIds.splice(idx, 1);
+      } else {
+        state.collectionIds.push(colId);
+      }
       document.dispatchEvent(new CustomEvent('sidebar-update'));
     });
     item.addEventListener('contextmenu', (e) => {

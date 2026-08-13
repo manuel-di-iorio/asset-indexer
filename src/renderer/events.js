@@ -14,6 +14,7 @@ import { showAddCollectionModal } from './modals/add-collection.js';
 import { showAddToCollectionModal } from './modals/add-to-collection.js';
 import { showRemoveTagFromAssetsModal } from './modals/remove-tag-from-assets.js';
 import { showRemoveFromCollectionModal } from './modals/remove-from-collection.js';
+import { showSettingsModal } from './modals/settings.js';
 
 let searchTimeout = null;
 let requestId = 0;
@@ -38,6 +39,7 @@ export function initEventListeners() {
   document.getElementById('btn-minimize').addEventListener('click', () => window.api.windowMinimize());
   document.getElementById('btn-maximize').addEventListener('click', () => window.api.windowMaximize());
   document.getElementById('btn-close').addEventListener('click', () => window.api.windowClose());
+  document.getElementById('btn-options').addEventListener('click', showSettingsModal);
 
   document.addEventListener('click', hideContextMenu);
 
@@ -69,15 +71,18 @@ export function initEventListeners() {
     if (!item) return;
     const cat = item.dataset.category;
     if (cat === 'favorites') {
-      state.favorites = true;
-      state.currentCategory = 'all';
-    } else {
-      state.currentCategory = cat;
+      state.favorites = !state.favorites;
+    } else if (cat === 'all') {
+      state.selectedCategories = [];
       state.favorites = false;
+    } else {
+      const idx = state.selectedCategories.indexOf(cat);
+      if (idx >= 0) {
+        state.selectedCategories.splice(idx, 1);
+      } else {
+        state.selectedCategories.push(cat);
+      }
     }
-    state.collectionId = null;
-    state.tagId = null;
-    state.libraryIds = [];
     updateSidebarActive();
     safeLoadAssets();
     updateBreadcrumb();
@@ -113,6 +118,7 @@ export function initEventListeners() {
   document.getElementById('btn-toggle-inspector').addEventListener('click', () => {
     state.inspectorVisible = !state.inspectorVisible;
     document.getElementById('inspector').classList.toggle('hidden', !state.inspectorVisible);
+    document.getElementById('inspector-resize').style.display = state.inspectorVisible ? '' : 'none';
     document.getElementById('btn-toggle-inspector').classList.toggle('active', state.inspectorVisible);
   });
 

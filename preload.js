@@ -34,6 +34,11 @@ contextBridge.exposeInMainWorld('api', {
   removeAssetFromCollections: (assetIds, collectionId) => ipcRenderer.invoke('remove-asset-from-collections', assetIds, collectionId),
 
   updateAssetMetadata: (assetId, fields) => ipcRenderer.invoke('update-asset-metadata', assetId, fields),
+  updateAssetsMetadata: (assetIds, fields) => ipcRenderer.invoke('update-assets-metadata', assetIds, fields),
+
+  exportDatabase: () => ipcRenderer.invoke('export-database'),
+  importDatabase: () => ipcRenderer.invoke('import-database'),
+  openDataFolder: () => ipcRenderer.invoke('open-data-folder'),
 
   getCategoryCounts: () => ipcRenderer.invoke('get-category-counts'),
   getTotalAssets: () => ipcRenderer.invoke('get-total-assets'),

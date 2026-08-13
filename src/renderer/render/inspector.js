@@ -91,7 +91,8 @@ export function showMultiSelection(count) {
 
   document.getElementById('inspector-tag-chips').innerHTML = '';
   document.getElementById('inspector-collection-chips').innerHTML = '';
-  hideUsage();
+
+  showUsageEmpty(count);
 
   const favBtn = document.getElementById('inspector-fav-btn');
   const selected = state.assets.filter(a => state.selectedAssetIds.includes(a.id));
@@ -151,15 +152,16 @@ function renderImageDimensions(width, height) {
 
 const usageLicenseInput = () => document.getElementById('usage-license-input');
 const usageNotesInput = () => document.getElementById('usage-notes-input');
+const usageMultiHint = () => document.getElementById('usage-multi-hint');
 
 let usageSaveTimer = null;
 let usagePending = null;
 
 function scheduleUsageSave() {
-  const assetId = state.selectedAsset ? state.selectedAsset.id : null;
-  if (!assetId) return;
+  const ids = state.selectedAssetIds.length ? state.selectedAssetIds : (state.selectedAsset ? [state.selectedAsset.id] : []);
+  if (ids.length === 0) return;
   usagePending = {
-    assetId,
+    ids: [...ids],
     license: usageLicenseInput().value.trim(),
     notes: usageNotesInput().value
   };
@@ -172,19 +174,28 @@ function flushUsageSave() {
   if (!usagePending) return;
   const pending = usagePending;
   usagePending = null;
-  window.api.updateAssetMetadata(pending.assetId, { license: pending.license, notes: pending.notes });
-  const cur = state.selectedAsset;
-  if (cur && cur.id === pending.assetId) { cur.license = pending.license; cur.notes = pending.notes; }
+  if (pending.ids.length === 1) {
+    window.api.updateAssetMetadata(pending.ids[0], { license: pending.license, notes: pending.notes });
+    const cur = state.selectedAsset;
+    if (cur && cur.id === pending.ids[0]) { cur.license = pending.license; cur.notes = pending.notes; }
+  } else if (pending.ids.length > 1) {
+    window.api.updateAssetsMetadata(pending.ids, { license: pending.license, notes: pending.notes });
+  }
 }
 
 function renderUsage(asset) {
   document.getElementById('inspector-usage').style.display = 'block';
+  if (usageMultiHint()) usageMultiHint().style.display = 'none';
   usageLicenseInput().value = asset.license || '';
   usageNotesInput().value = asset.notes || '';
 }
 
-function hideUsage() {
-  document.getElementById('inspector-usage').style.display = 'none';
+function showUsageEmpty(count) {
+  document.getElementById('inspector-usage').style.display = 'block';
+  if (usageMultiHint()) {
+    usageMultiHint().textContent = `License/notes will be applied to all ${count} selected assets.`;
+    usageMultiHint().style.display = 'block';
+  }
   usageLicenseInput().value = '';
   usageNotesInput().value = '';
 }

@@ -26,8 +26,10 @@ function createWindow() {
       : path.join(__dirname, 'src', 'renderer', 'icon.ico')
   });
 
-  mainWindow.maximize();
-  mainWindow.show();
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.maximize();
+    mainWindow.show();
+  });
 
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);

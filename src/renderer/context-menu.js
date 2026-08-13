@@ -61,7 +61,7 @@ async function handleContextAction(action) {
   } else if (action === 'delete' && type === 'tag') {
     if (confirm('Delete this tag from all assets?')) {
       await window.api.deleteTag(target);
-      if (state.tagId === target) state.tagId = null;
+      state.tagIds = state.tagIds.filter(id => id !== target);
       await loadTags();
       await loadAssets();
       document.dispatchEvent(new CustomEvent('breadcrumb-update'));
@@ -71,7 +71,7 @@ async function handleContextAction(action) {
   } else if (action === 'delete' && type === 'collection') {
     if (confirm('Delete this collection?')) {
       await window.api.deleteCollection(target);
-      if (state.collectionId === target) state.collectionId = null;
+      state.collectionIds = state.collectionIds.filter(id => id !== target);
       await loadCollections();
       await loadAssets();
       document.dispatchEvent(new CustomEvent('breadcrumb-update'));
