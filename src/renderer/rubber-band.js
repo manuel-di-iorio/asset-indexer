@@ -89,6 +89,9 @@ export function initRubberBand() {
   grid.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
     if (e.target.closest('.asset-card')) return;
+    const r = grid.getBoundingClientRect();
+    if (grid.scrollHeight > grid.clientHeight + 1 && e.clientX >= r.right - 12) return;
+    if (grid.scrollWidth > grid.clientWidth + 1 && e.clientY >= r.bottom - 12) return;
     e.preventDefault();
     active = true;
     moved = false;
