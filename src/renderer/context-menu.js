@@ -7,6 +7,8 @@ import { showRemoveTagFromAssetsModal } from './modals/remove-tag-from-assets.js
 import { showRemoveFromCollectionModal } from './modals/remove-from-collection.js';
 import { showRenameTagModal } from './modals/rename-tag.js';
 import { showRenameCollectionModal } from './modals/rename-collection.js';
+import { showRenameAssetModal } from './modals/rename-asset.js';
+import { showDeleteAssetModal } from './modals/delete-asset.js';
 import { toggleFavoriteSelected, copySelectedPaths, openSelectedInExplorer } from './bulk-actions.js';
 
 let contextMenuTarget = null;
@@ -92,6 +94,10 @@ async function handleContextAction(action) {
     copySelectedPaths();
   } else if (action === 'open-selected') {
     openSelectedInExplorer();
+  } else if (action === 'rename-asset') {
+    showRenameAssetModal();
+  } else if (action === 'delete-assets') {
+    showDeleteAssetModal();
   }
 }
 
@@ -100,7 +106,9 @@ const ASSET_MENU_ICONS = {
   folder: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>',
   favorite: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
   copy: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>',
-  open: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>'
+  open: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>',
+  rename: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>',
+  trash: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>'
 };
 
 export function showAssetContextMenu(x, y) {
@@ -126,6 +134,11 @@ export function showAssetContextMenu(x, y) {
     { type: 'separator' },
     { label: 'Copy Paths', icon: ASSET_MENU_ICONS.copy, action: 'copy-paths' },
     { label: 'Open in File Explorer', icon: ASSET_MENU_ICONS.open, action: 'open-selected', disabled: n > 1 }
+  );
+  items.push(
+    { type: 'separator' },
+    { label: 'Rename Asset', icon: ASSET_MENU_ICONS.rename, action: 'rename-asset', disabled: n !== 1 },
+    { label: n === 1 ? 'Delete Asset' : `Delete ${n} Assets`, icon: ASSET_MENU_ICONS.trash, action: 'delete-assets', danger: true }
   );
 
   showContextMenu(x, y, items);

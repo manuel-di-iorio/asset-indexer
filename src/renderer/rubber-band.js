@@ -57,6 +57,17 @@ function normalizeBand(x1, y1, x2, y2) {
   };
 }
 
+function clampBand(rect) {
+  const maxRight = Math.max(grid.scrollWidth, 0);
+  const maxBottom = Math.max(grid.scrollHeight, 0);
+  return {
+    left: Math.max(0, Math.min(rect.left, maxRight)),
+    top: Math.max(0, Math.min(rect.top, maxBottom)),
+    right: Math.max(0, Math.min(rect.right, maxRight)),
+    bottom: Math.max(0, Math.min(rect.bottom, maxBottom))
+  };
+}
+
 function applyBand(rect) {
   const band = getBand();
   band.style.left = rect.left + 'px';
@@ -99,10 +110,12 @@ function scrollFrame() {
     if (lastClientX < r.left + EDGE_MARGIN) dx = -((r.left + EDGE_MARGIN - lastClientX) / EDGE_MARGIN) * MAX_SCROLL;
     else if (lastClientX > r.right - EDGE_MARGIN) dx = ((lastClientX - (r.right - EDGE_MARGIN)) / EDGE_MARGIN) * MAX_SCROLL;
     if (dx !== 0 || dy !== 0) {
-      grid.scrollLeft += dx;
-      grid.scrollTop += dy;
+      const maxTop = Math.max(grid.scrollHeight - grid.clientHeight, 0);
+      const maxLeft = Math.max(grid.scrollWidth - grid.clientWidth, 0);
+      grid.scrollLeft = Math.min(Math.max(grid.scrollLeft + dx, 0), maxLeft);
+      grid.scrollTop = Math.min(Math.max(grid.scrollTop + dy, 0), maxTop);
       const p = contentPos(lastClientX, lastClientY);
-      bandRect = normalizeBand(startX, startY, p.x, p.y);
+      bandRect = clampBand(normalizeBand(startX, startY, p.x, p.y));
       applyBand(bandRect);
       updatePreview(lastMods);
     }
@@ -164,7 +177,7 @@ export function initRubberBand() {
     lastClientY = e.clientY;
     lastMods = { shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey };
     const p = contentPos(e.clientX, e.clientY);
-    bandRect = normalizeBand(startX, startY, p.x, p.y);
+    bandRect = clampBand(normalizeBand(startX, startY, p.x, p.y));
     applyBand(bandRect);
     if (!moved && (Math.abs(p.x - startX) > 3 || Math.abs(p.y - startY) > 3)) moved = true;
     updatePreview(lastMods);

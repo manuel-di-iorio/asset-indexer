@@ -108,6 +108,7 @@ function setupThumbnailObserver() {
 function maybeLoadMore() {
   const grid = document.getElementById('asset-grid');
   if (!grid || state.isLoading || !state.hasMore) return;
+  if (grid.classList.contains('rubber-dragging')) return;
   if (grid.scrollTop + grid.clientHeight >= grid.scrollHeight - 800) {
     loadMoreAssets().then(() => {
       appendMoreAssets();

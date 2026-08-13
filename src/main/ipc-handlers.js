@@ -416,6 +416,34 @@ function registerIpcHandlers(db, getMainWindow, app) {
     }
   });
 
+  ipcMain.handle('delete-assets', async (event, assetIds) => {
+    if (!Array.isArray(assetIds) || assetIds.length === 0) return { error: 'No assets selected' };
+    const getPath = db.prepare('SELECT file_path FROM assets WHERE id = ?');
+    const delTags = db.prepare('DELETE FROM asset_tags WHERE asset_id = ?');
+    const delCols = db.prepare('DELETE FROM asset_collections WHERE asset_id = ?');
+    const delAsset = db.prepare('DELETE FROM assets WHERE id = ?');
+    const deleted = [];
+    const failed = [];
+    for (const id of assetIds) {
+      const row = getPath.get(id);
+      if (!row) continue;
+      ignorePath(row.file_path);
+      try {
+        await shell.trashItem(row.file_path);
+      } catch (e) {
+        failed.push(id);
+        continue;
+      }
+      try { fs.unlinkSync(getThumbCachePath(row.file_path, cacheDir)); } catch (e) {}
+      delTags.run(id);
+      delCols.run(id);
+      delAsset.run(id);
+      deleted.push(id);
+    }
+    invalidateCountCache();
+    return { ok: true, deleted: deleted.length, failed: failed.length };
+  });
+
   ipcMain.handle('get-collections', () => {
     return db.prepare('SELECT c.*, (SELECT COUNT(*) FROM asset_collections WHERE collection_id = c.id) as asset_count FROM collections c ORDER BY c.name').all();
   });
