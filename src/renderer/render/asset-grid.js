@@ -1,13 +1,13 @@
 import { state } from '../state.js';
 import { escapeHtml, getCategoryFromExt } from '../utils.js';
 import { CATEGORY_ICONS, CATEGORY_COLORS, CATEGORY_LABELS } from '../constants.js';
-import { selectSingle, toggleSelect, rangeSelect } from '../selection.js';
+import { selectSingle, toggleSelect, rangeSelect, syncSelectionCache } from '../selection.js';
 import { showAssetContextMenu } from '../context-menu.js';
 import { loadMoreAssets } from '../api.js';
 
 let thumbObserver = null;
 let thumbnailCache = {};
-let currentRenderId = 0;
+let thumbRafPending = false;
 let thumbScrollHandler = null;
 let renderedCount = 0;
 
@@ -52,37 +52,42 @@ function createCardHTML(asset) {
 }
 
 function loadThumbnailsForVisible() {
-  const grid = document.getElementById('asset-grid');
-  if (!grid) return;
-  const thumbContainers = grid.querySelectorAll('.card-thumbnail[data-thumb-path]');
-  if (thumbContainers.length === 0) return;
+  if (thumbRafPending) return;
+  thumbRafPending = true;
+  requestAnimationFrame(() => {
+    thumbRafPending = false;
+    const grid = document.getElementById('asset-grid');
+    if (!grid) return;
+    const thumbContainers = grid.querySelectorAll('.card-thumbnail[data-thumb-path]');
+    if (thumbContainers.length === 0) return;
 
-  const paths = [];
-  const containerMap = [];
-  thumbContainers.forEach(container => {
-    const rect = container.getBoundingClientRect();
-    const isVisible = rect.top < window.innerHeight + 300 && rect.bottom > -300;
-    if (!isVisible) return;
-    const path = container.dataset.thumbPath;
-    if (thumbnailCache[path]) {
-      container.innerHTML = `<img class="card-thumb-img" src="${thumbnailCache[path]}" alt="" loading="lazy">`;
-      container.removeAttribute('data-thumb-path');
-    } else {
-      paths.push(path);
-      containerMap.push(container);
-    }
-  });
-
-  if (paths.length === 0) return;
-
-  window.api.getThumbnailsBatch(paths).then(results => {
-    Object.assign(thumbnailCache, results);
-    containerMap.forEach((container, i) => {
-      const thumb = results[paths[i]];
-      if (thumb) {
-        container.innerHTML = `<img class="card-thumb-img" src="${thumb}" alt="" loading="lazy">`;
+    const paths = [];
+    const containerMap = [];
+    thumbContainers.forEach(container => {
+      const rect = container.getBoundingClientRect();
+      const isVisible = rect.top < window.innerHeight + 300 && rect.bottom > -300;
+      if (!isVisible) return;
+      const path = container.dataset.thumbPath;
+      if (thumbnailCache[path]) {
+        container.innerHTML = `<img class="card-thumb-img" src="${thumbnailCache[path]}" alt="" loading="lazy">`;
         container.removeAttribute('data-thumb-path');
+      } else {
+        paths.push(path);
+        containerMap.push(container);
       }
+    });
+
+    if (paths.length === 0) return;
+
+    window.api.getThumbnailsBatch(paths).then(results => {
+      Object.assign(thumbnailCache, results);
+      containerMap.forEach((container, i) => {
+        const thumb = results[paths[i]];
+        if (thumb) {
+          container.innerHTML = `<img class="card-thumb-img" src="${thumb}" alt="" loading="lazy">`;
+          container.removeAttribute('data-thumb-path');
+        }
+      });
     });
   });
 }
@@ -117,45 +122,51 @@ function maybeLoadMore() {
   }
 }
 
-function buildCard(asset, renderId) {
+function buildCard(asset) {
   const temp = document.createElement('div');
   temp.innerHTML = createCardHTML(asset);
   const el = temp.firstElementChild;
   if (state.selectedAssetIds.includes(asset.id)) el.classList.add('selected');
   if (asset.id === state.focusedAssetId) el.classList.add('focused');
-  el.addEventListener('click', (e) => {
-    if (currentRenderId !== renderId) return;
-    if (e.shiftKey) {
-      rangeSelect(asset.id);
-    } else if (e.ctrlKey || e.metaKey) {
-      toggleSelect(asset.id);
-    } else {
-      selectSingle(asset.id);
-    }
-  });
-  el.addEventListener('contextmenu', (e) => {
-    if (currentRenderId !== renderId) return;
-    e.preventDefault();
-    e.stopPropagation();
-    if (!state.selectedAssetIds.includes(asset.id)) {
-      selectSingle(asset.id);
-    }
-    showAssetContextMenu(e.clientX, e.clientY);
-  });
   return el;
 }
 
-function appendCards(renderId) {
+// Single delegated listener instead of one per card
+function setupGridDelegation() {
+  const grid = document.getElementById('asset-grid');
+  if (!grid || grid._delegated) return;
+  grid._delegated = true;
+
+  grid.addEventListener('click', (e) => {
+    const card = e.target.closest('.asset-card');
+    if (!card) return;
+    const id = parseInt(card.dataset.id);
+    if (e.shiftKey) rangeSelect(id);
+    else if (e.ctrlKey || e.metaKey) toggleSelect(id);
+    else selectSingle(id);
+  });
+
+  grid.addEventListener('contextmenu', (e) => {
+    const card = e.target.closest('.asset-card');
+    if (!card) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const id = parseInt(card.dataset.id);
+    if (!state.selectedAssetIds.includes(id)) selectSingle(id);
+    showAssetContextMenu(e.clientX, e.clientY);
+  });
+}
+
+function appendCards() {
   const grid = document.getElementById('asset-grid');
   const frag = document.createDocumentFragment();
   const slice = state.assets.slice(renderedCount);
-  slice.forEach(asset => frag.appendChild(buildCard(asset, renderId)));
+  slice.forEach(asset => frag.appendChild(buildCard(asset)));
   renderedCount = state.assets.length;
   grid.appendChild(frag);
 }
 
 export function renderAssets() {
-  const renderId = ++currentRenderId;
   const grid = document.getElementById('asset-grid');
   const emptyState = document.getElementById('empty-state');
 
@@ -163,14 +174,17 @@ export function renderAssets() {
     grid.innerHTML = '';
     emptyState.style.display = 'flex';
     renderedCount = 0;
+    syncSelectionCache();
     return;
   }
 
   emptyState.style.display = 'none';
   grid.innerHTML = '';
   renderedCount = 0;
-  appendCards(renderId);
+  appendCards();
   grid.classList.toggle('list-view', state.viewMode === 'list');
+  setupGridDelegation();
+  syncSelectionCache();
 
   loadThumbnailsForVisible();
   setupThumbnailObserver();
@@ -180,8 +194,7 @@ export function renderAssets() {
 export function appendMoreAssets() {
   const grid = document.getElementById('asset-grid');
   if (!grid || renderedCount >= state.assets.length) return;
-  const renderId = currentRenderId;
-  appendCards(renderId);
+  appendCards();
   loadThumbnailsForVisible();
   setupThumbnailObserver();
 }

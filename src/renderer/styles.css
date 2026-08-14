@@ -1819,3 +1819,21 @@ button, select, input {
   font-size: calc(11px * var(--text-zoom, 1));
   color: var(--text-secondary);
 }
+
+#fps-overlay {
+  position: fixed;
+  bottom: 36px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.75);
+  color: var(--green);
+  font-family: monospace;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  z-index: 9999;
+  pointer-events: none;
+  display: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  letter-spacing: 0.05em;
+}

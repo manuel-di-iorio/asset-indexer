@@ -3,6 +3,8 @@ import { selectAsset, clearInspector, showMultiSelection } from './render/inspec
 
 let selectionToken = 0;
 let anchorId = null;
+let prevSelectedSet = new Set();
+let prevFocusedId = null;
 
 export function getSelectedIds() {
   return state.selectedAssetIds;
@@ -10,6 +12,7 @@ export function getSelectedIds() {
 
 export function updateSelectionUI() {
   const n = state.selectedAssetIds.length;
+  const selectedSet = new Set(state.selectedAssetIds);
 
   const status = document.getElementById('status-selected');
   if (status) status.textContent = `${n} selected`;
@@ -19,30 +22,32 @@ export function updateSelectionUI() {
   const bulkCount = document.getElementById('bulk-count');
   if (bulkCount) bulkCount.textContent = `${n} selected`;
 
-  const removeTagBtn = document.getElementById('bulk-btn-remove-tag');
-  if (removeTagBtn) {
-    const hasTags = state.assets.some(a => state.selectedAssetIds.includes(a.id) && a.tags);
-    removeTagBtn.style.display = hasTags ? '' : 'none';
-  }
+  if (n > 1) {
+    const removeTagBtn = document.getElementById('bulk-btn-remove-tag');
+    if (removeTagBtn) {
+      const hasTags = state.assets.some(a => selectedSet.has(a.id) && a.tags);
+      removeTagBtn.style.display = hasTags ? '' : 'none';
+    }
 
-  const addTagBtn = document.getElementById('bulk-btn-tag');
-  if (addTagBtn) {
-    const selected = state.assets.filter(a => state.selectedAssetIds.includes(a.id));
-    const hasAddableTag = state.tags.some(tag => selected.some(a => !(a.tags || '').split(',').map(s => s.trim()).includes(tag.name)));
-    addTagBtn.style.display = hasAddableTag ? '' : 'none';
-  }
+    const addTagBtn = document.getElementById('bulk-btn-tag');
+    if (addTagBtn) {
+      const selected = state.assets.filter(a => selectedSet.has(a.id));
+      const hasAddableTag = state.tags.some(tag => selected.some(a => !(a.tags || '').split(',').map(s => s.trim()).includes(tag.name)));
+      addTagBtn.style.display = hasAddableTag ? '' : 'none';
+    }
 
-  const removeColBtn = document.getElementById('bulk-btn-remove-collection');
-  if (removeColBtn) {
-    const hasCollections = state.assets.some(a => state.selectedAssetIds.includes(a.id) && a.collections);
-    removeColBtn.style.display = hasCollections ? '' : 'none';
-  }
+    const removeColBtn = document.getElementById('bulk-btn-remove-collection');
+    if (removeColBtn) {
+      const hasCollections = state.assets.some(a => selectedSet.has(a.id) && a.collections);
+      removeColBtn.style.display = hasCollections ? '' : 'none';
+    }
 
-  const addColBtn = document.getElementById('bulk-btn-collection');
-  if (addColBtn) {
-    const selected = state.assets.filter(a => state.selectedAssetIds.includes(a.id));
-    const hasAddableCol = state.collections.some(c => selected.some(a => !(a.collections || '').split(',').map(s => s.trim()).includes(c.name)));
-    addColBtn.style.display = hasAddableCol ? '' : 'none';
+    const addColBtn = document.getElementById('bulk-btn-collection');
+    if (addColBtn) {
+      const selected = state.assets.filter(a => selectedSet.has(a.id));
+      const hasAddableCol = state.collections.some(c => selected.some(a => !(a.collections || '').split(',').map(s => s.trim()).includes(c.name)));
+      addColBtn.style.display = hasAddableCol ? '' : 'none';
+    }
   }
 
   const openBtn = document.getElementById('btn-open-external');
@@ -51,12 +56,42 @@ export function updateSelectionUI() {
   const grid = document.getElementById('asset-grid');
   if (grid) {
     grid.classList.toggle('has-bulk', n > 1);
-    grid.querySelectorAll('.asset-card').forEach(card => {
-      const id = parseInt(card.dataset.id);
-      card.classList.toggle('selected', state.selectedAssetIds.includes(id));
-      card.classList.toggle('focused', id === state.focusedAssetId);
-    });
+
+    // Compute symmetric difference; batch-update all cards when large changes (selectAll/clear)
+    const changed = [...prevSelectedSet, ...selectedSet].filter(
+      id => prevSelectedSet.has(id) !== selectedSet.has(id)
+    );
+    if (changed.length > 50) {
+      grid.querySelectorAll('.asset-card').forEach(card => {
+        const id = parseInt(card.dataset.id);
+        card.classList.toggle('selected', selectedSet.has(id));
+        card.classList.toggle('focused', id === state.focusedAssetId);
+      });
+    } else {
+      changed.forEach(id => {
+        const card = grid.querySelector(`.asset-card[data-id="${id}"]`);
+        if (card) card.classList.toggle('selected', selectedSet.has(id));
+      });
+      if (prevFocusedId !== state.focusedAssetId) {
+        if (prevFocusedId !== null) {
+          const prev = grid.querySelector(`.asset-card[data-id="${prevFocusedId}"]`);
+          if (prev) prev.classList.remove('focused');
+        }
+        if (state.focusedAssetId !== null) {
+          const next = grid.querySelector(`.asset-card[data-id="${state.focusedAssetId}"]`);
+          if (next) next.classList.add('focused');
+        }
+      }
+    }
   }
+
+  prevSelectedSet = selectedSet;
+  prevFocusedId = state.focusedAssetId;
+}
+
+export function syncSelectionCache() {
+  prevSelectedSet = new Set(state.selectedAssetIds);
+  prevFocusedId = state.focusedAssetId;
 }
 
 export async function syncSelection() {

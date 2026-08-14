@@ -3,6 +3,7 @@ import { moveSelection, selectAll, selectFirst, selectLast, clearSelection } fro
 import { hideContextMenu } from './context-menu.js';
 import { openSelectedInExplorer } from './bulk-actions.js';
 import { showRenameAssetModal } from './modals/rename-asset.js';
+import { toggleDebugMode } from './fps.js';
 
 function isTypingTarget(el) {
   if (!el) return false;
@@ -26,6 +27,12 @@ export function initKeyboardShortcuts() {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
       e.preventDefault();
       selectAll();
+      return;
+    }
+
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'd') {
+      e.preventDefault();
+      toggleDebugMode();
       return;
     }
 
