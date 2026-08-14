@@ -42,6 +42,8 @@
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
   --transition: 150ms ease;
+  --ui-zoom: 1;
+  --text-zoom: 1;
 }
 
 [data-theme="light"] {
@@ -73,7 +75,7 @@ html, body {
   background: var(--bg-primary);
   color: var(--text-primary);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-zoom, 1));
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   user-select: none;
@@ -82,7 +84,8 @@ html, body {
 .app {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  width: calc(100vw / var(--ui-zoom, 1));
+  height: calc(100vh / var(--ui-zoom, 1));
 }
 
 /* Title Bar */
@@ -113,7 +116,7 @@ html, body {
 
 .titlebar-title {
   font-weight: 600;
-  font-size: 14px;
+  font-size: calc(14px * var(--text-zoom, 1));
   letter-spacing: -0.02em;
 }
 
@@ -134,7 +137,7 @@ html, body {
   color: var(--text-secondary);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--text-zoom, 1));
   font-weight: 500;
   transition: all var(--transition);
   font-family: inherit;
@@ -255,7 +258,7 @@ body.resizing * {
   align-items: center;
   justify-content: space-between;
   padding: 4px 16px 8px;
-  font-size: 10px;
+  font-size: calc(10px * var(--text-zoom, 1));
   font-weight: 600;
   letter-spacing: 0.08em;
   color: var(--text-muted);
@@ -273,7 +276,7 @@ body.resizing * {
   color: var(--text-secondary);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 14px;
+  font-size: calc(14px * var(--text-zoom, 1));
   font-weight: 600;
   transition: all var(--transition);
   font-family: inherit;
@@ -326,7 +329,7 @@ body.resizing * {
 
 .item-name {
   flex: 1;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-zoom, 1));
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -334,7 +337,7 @@ body.resizing * {
 }
 
 .item-count {
-  font-size: 10px;
+  font-size: calc(10px * var(--text-zoom, 1));
   font-weight: 600;
   padding: 1px 6px;
   border-radius: 10px;
@@ -362,7 +365,7 @@ body.resizing * {
   color: var(--accent);
   border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 12px;
+  font-size: calc(12px * var(--text-zoom, 1));
   font-weight: 600;
   transition: all var(--transition);
   font-family: inherit;
@@ -400,7 +403,7 @@ body.resizing * {
   background: var(--bg-tertiary);
   border-radius: var(--radius-sm);
   font-weight: 500;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-zoom, 1));
   flex-shrink: 0;
 }
 
@@ -456,7 +459,7 @@ body.resizing * {
   border: 1px solid var(--border-color);
   color: var(--text-primary);
   border-radius: var(--radius-sm);
-  font-size: 12px;
+  font-size: calc(12px * var(--text-zoom, 1));
   font-family: inherit;
   cursor: pointer;
   appearance: none;
@@ -495,7 +498,7 @@ body.resizing * {
   border: 1px solid var(--border-color);
   color: var(--text-primary);
   border-radius: var(--radius-md);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-zoom, 1));
   font-family: inherit;
   transition: all var(--transition);
 }
@@ -524,7 +527,7 @@ body.resizing * {
 }
 
 .sort-label {
-  font-size: 12px;
+  font-size: calc(12px * var(--text-zoom, 1));
   color: var(--text-muted);
   font-weight: 500;
 }
@@ -532,7 +535,7 @@ body.resizing * {
 /* Content Info */
 .content-info {
   padding: 6px 20px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--text-zoom, 1));
   color: var(--text-muted);
   font-weight: 500;
 }
@@ -557,7 +560,7 @@ body.resizing * {
 }
 
 .bulk-count {
-  font-size: 12px;
+  font-size: calc(12px * var(--text-zoom, 1));
   font-weight: 600;
   color: var(--accent-hover);
   white-space: nowrap;
@@ -577,7 +580,7 @@ body.resizing * {
   color: var(--text-secondary);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--text-zoom, 1));
   font-weight: 500;
   transition: all var(--transition);
   font-family: inherit;
@@ -790,7 +793,7 @@ body.resizing * {
 }
 
 .asset-card .card-name {
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--text-zoom, 1));
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -803,7 +806,7 @@ body.resizing * {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 10px;
+  font-size: calc(10px * var(--text-zoom, 1));
   color: var(--text-muted);
 }
 
@@ -870,7 +873,7 @@ body.resizing * {
   justify-content: center;
   gap: 12px;
   color: var(--text-muted);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-zoom, 1));
 }
 
 .inspector-content {
@@ -894,7 +897,7 @@ body.resizing * {
 }
 
 .inspector-title {
-  font-size: 14px;
+  font-size: calc(14px * var(--text-zoom, 1));
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -973,7 +976,7 @@ body.resizing * {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--text-zoom, 1));
   color: var(--text-muted);
   width: 100px;
   flex-shrink: 0;
@@ -984,7 +987,7 @@ body.resizing * {
 }
 
 .detail-value {
-  font-size: 12px;
+  font-size: calc(12px * var(--text-zoom, 1));
   color: var(--text-primary);
   word-break: break-all;
   flex: 1;
@@ -992,7 +995,7 @@ body.resizing * {
 
 .detail-value.mono {
   font-family: 'SF Mono', 'Consolas', monospace;
-  font-size: 11px;
+  font-size: calc(11px * var(--text-zoom, 1));
   color: var(--text-secondary);
 }
 
@@ -1007,7 +1010,7 @@ body.resizing * {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 8px;
-  font-size: 10px;
+  font-size: calc(10px * var(--text-zoom, 1));
   font-weight: 600;
   letter-spacing: 0.08em;
   color: var(--text-muted);
@@ -1027,7 +1030,7 @@ body.resizing * {
   padding: 4px 10px;
   background: var(--bg-tertiary);
   border-radius: 20px;
-  font-size: 11px;
+  font-size: calc(11px * var(--text-zoom, 1));
   font-weight: 500;
   color: var(--text-primary);
   border: 1px solid var(--border-color);
@@ -1044,7 +1047,7 @@ body.resizing * {
   color: var(--text-muted);
   cursor: pointer;
   border-radius: 50%;
-  font-size: 12px;
+  font-size: calc(12px * var(--text-zoom, 1));
   line-height: 1;
 }
 
@@ -1065,7 +1068,7 @@ body.resizing * {
   color: white;
   border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-zoom, 1));
   font-weight: 600;
   transition: all var(--transition);
   font-family: inherit;
@@ -1092,13 +1095,13 @@ body.resizing * {
 }
 
 .empty-state h3 {
-  font-size: 16px;
+  font-size: calc(16px * var(--text-zoom, 1));
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .empty-state p {
-  font-size: 13px;
+  font-size: calc(13px * var(--text-zoom, 1));
   color: var(--text-muted);
   text-align: center;
 }
@@ -1112,7 +1115,7 @@ body.resizing * {
   padding: 0 16px;
   background: var(--bg-secondary);
   border-top: 1px solid var(--border-color);
-  font-size: 11px;
+  font-size: calc(11px * var(--text-zoom, 1));
   color: var(--text-muted);
   flex-shrink: 0;
 }
@@ -1164,7 +1167,7 @@ body.resizing * {
 }
 
 .modal-title {
-  font-size: 15px;
+  font-size: calc(15px * var(--text-zoom, 1));
   font-weight: 600;
 }
 
@@ -1201,7 +1204,7 @@ body.resizing * {
 
 .modal-body label {
   display: block;
-  font-size: 12px;
+  font-size: calc(12px * var(--text-zoom, 1));
   font-weight: 500;
   color: var(--text-secondary);
   margin-bottom: 6px;
@@ -1214,7 +1217,7 @@ body.resizing * {
   border: 1px solid var(--border-color);
   color: var(--text-primary);
   border-radius: var(--radius-sm);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-zoom, 1));
   font-family: inherit;
   outline: none;
   transition: border-color var(--transition);
@@ -1245,7 +1248,7 @@ body.resizing * {
 .modal-footer .btn {
   padding: 8px 16px;
   border-radius: var(--radius-sm);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-zoom, 1));
   font-weight: 500;
   cursor: pointer;
   transition: all var(--transition);
@@ -1284,7 +1287,7 @@ body.resizing * {
 /* Content Info */
 .content-info {
   padding: 4px 20px;
-  font-size: 11px;
+  font-size: calc(11px * var(--text-zoom, 1));
   color: var(--text-muted);
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
@@ -1298,7 +1301,7 @@ body.resizing * {
 }
 
 .sort-label {
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--text-zoom, 1));
   color: var(--text-muted);
 }
 
@@ -1387,14 +1390,14 @@ body.resizing * {
 }
 
 .no-libraries-msg h3 {
-  font-size: 15px;
+  font-size: calc(15px * var(--text-zoom, 1));
   font-weight: 600;
   color: var(--text-secondary);
   margin-bottom: 8px;
 }
 
 .no-libraries-msg p {
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-zoom, 1));
   margin-bottom: 16px;
 }
 
@@ -1428,7 +1431,7 @@ body.resizing * {
   color: var(--text-secondary);
   border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-zoom, 1));
   font-weight: 500;
   transition: all var(--transition);
   font-family: inherit;
@@ -1479,7 +1482,7 @@ body.resizing * {
 
 .usage-label {
   display: block;
-  font-size: 10px;
+  font-size: calc(10px * var(--text-zoom, 1));
   font-weight: 600;
   letter-spacing: 0.08em;
   color: var(--text-muted);
@@ -1494,7 +1497,7 @@ body.resizing * {
   border: 1px solid var(--border-color);
   color: var(--text-primary);
   border-radius: var(--radius-sm);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-zoom, 1));
   font-family: inherit;
   outline: none;
   transition: border-color var(--transition);
@@ -1511,7 +1514,7 @@ body.resizing * {
   border: 1px solid var(--border-color);
   color: var(--text-primary);
   border-radius: var(--radius-sm);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-zoom, 1));
   font-family: inherit;
   outline: none;
   resize: vertical;
@@ -1615,7 +1618,7 @@ body.resizing * {
   padding: 8px 12px;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 12px;
+  font-size: calc(12px * var(--text-zoom, 1));
   font-weight: 500;
   color: var(--text-secondary);
   transition: all 100ms ease;
@@ -1705,7 +1708,7 @@ body.resizing * {
   border-radius: var(--radius-md);
   padding: 12px;
   font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
-  font-size: 11px;
+  font-size: calc(11px * var(--text-zoom, 1));
   line-height: 1.6;
   color: var(--text-secondary);
   white-space: pre-wrap;
@@ -1720,7 +1723,7 @@ body.resizing * {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   padding: 12px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--text-zoom, 1));
   line-height: 1.6;
   color: var(--text-secondary);
   white-space: pre-wrap;
@@ -1752,7 +1755,7 @@ button, select, input {
 }
 
 .settings-section-title {
-  font-size: 10px;
+  font-size: calc(10px * var(--text-zoom, 1));
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1767,7 +1770,7 @@ button, select, input {
   border: 1px solid var(--border-color);
   color: var(--text-primary);
   border-radius: var(--radius-sm);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--text-zoom, 1));
   font-family: inherit;
   cursor: pointer;
   appearance: none;
@@ -1779,6 +1782,12 @@ button, select, input {
 .settings-select:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+.settings-section input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
 .settings-btn {
@@ -1794,9 +1803,8 @@ button, select, input {
 .settings-status {
   min-height: 18px;
   margin-top: 14px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border-color);
-  font-size: 11.5px;
+  padding-top: 0;
+  font-size: calc(11.5px * var(--text-zoom, 1));
   color: var(--text-muted);
   word-break: break-all;
 }
@@ -1808,6 +1816,6 @@ button, select, input {
   background: var(--accent-subtle);
   border: 1px solid var(--accent-glow);
   border-radius: var(--radius-sm);
-  font-size: 11px;
+  font-size: calc(11px * var(--text-zoom, 1));
   color: var(--text-secondary);
 }

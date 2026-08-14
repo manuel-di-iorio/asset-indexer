@@ -1,5 +1,6 @@
 import { showModal, hideModal } from './modal.js';
 import { applyTheme } from '../theme.js';
+import { applyUiZoom, applyTextZoom, getUiZoom, getTextZoom, ZOOM_MIN, ZOOM_MAX } from '../zoom.js';
 import { escapeHtml } from '../utils.js';
 
 function setStatus(msg, isError) {
@@ -13,14 +14,23 @@ export function showSettingsModal() {
   showModal('Options', `
     <div class="settings-section">
       <div class="settings-section-title">Appearance</div>
-      <div class="form-group" style="margin-bottom:0;">
+      <div class="form-group">
         <label for="settings-theme">Theme</label>
         <select id="settings-theme" class="settings-select">
           <option value="dark">Dark</option>
           <option value="light">Light</option>
         </select>
       </div>
+      <div class="form-group">
+        <label for="settings-ui-zoom">Interface Zoom (<span id="settings-ui-zoom-value">100%</span>)</label>
+        <input type="range" id="settings-ui-zoom" min="${ZOOM_MIN}" max="${ZOOM_MAX}" step="0.05" />
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label for="settings-text-zoom">Text Zoom (<span id="settings-text-zoom-value">100%</span>)</label>
+        <input type="range" id="settings-text-zoom" min="${ZOOM_MIN}" max="${ZOOM_MAX}" step="0.05" />
+      </div>
     </div>
+
 
     <div class="settings-section">
       <div class="settings-section-title">Database</div>
@@ -46,6 +56,24 @@ export function showSettingsModal() {
   const themeSelect = document.getElementById('settings-theme');
   themeSelect.value = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
   themeSelect.addEventListener('change', () => applyTheme(themeSelect.value));
+
+  const uiZoomInput = document.getElementById('settings-ui-zoom');
+  const uiZoomValue = document.getElementById('settings-ui-zoom-value');
+  uiZoomInput.value = getUiZoom();
+  uiZoomValue.textContent = `${Math.round(getUiZoom() * 100)}%`;
+  uiZoomInput.addEventListener('input', () => {
+    const zoom = applyUiZoom(uiZoomInput.value);
+    uiZoomValue.textContent = `${Math.round(zoom * 100)}%`;
+  });
+
+  const textZoomInput = document.getElementById('settings-text-zoom');
+  const textZoomValue = document.getElementById('settings-text-zoom-value');
+  textZoomInput.value = getTextZoom();
+  textZoomValue.textContent = `${Math.round(getTextZoom() * 100)}%`;
+  textZoomInput.addEventListener('input', () => {
+    const zoom = applyTextZoom(textZoomInput.value);
+    textZoomValue.textContent = `${Math.round(zoom * 100)}%`;
+  });
 
   document.getElementById('modal-cancel-settings')?.addEventListener('click', hideModal);
 

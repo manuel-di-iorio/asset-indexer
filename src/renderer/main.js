@@ -7,6 +7,7 @@ import { initEventListeners } from './events.js';
 import { initResizeHandles } from './resize.js';
 import { initRubberBand } from './rubber-band.js';
 import { initTheme } from './theme.js';
+import { initZoom } from './zoom.js';
 import { version } from '../../package.json';
 
 function hideSplash() {
@@ -17,6 +18,7 @@ function hideSplash() {
 async function init() {
   setTimeout(hideSplash, 8000);
   initTheme();
+  initZoom();
   initResizeHandles();
   initRubberBand();
   document.getElementById('status-version').textContent = `v${version}`;
