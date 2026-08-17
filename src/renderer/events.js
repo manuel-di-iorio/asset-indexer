@@ -170,23 +170,8 @@ export function initEventListeners() {
     loadCategoryCounts();
   });
 
-  document.getElementById('btn-open-external').addEventListener('click', () => {
+  document.getElementById('bulk-btn-open-external').addEventListener('click', () => {
     if (state.selectedAssetIds.length > 0 || state.selectedAsset) openSelectedInExplorer();
-  });
-
-  document.getElementById('btn-copy-path').addEventListener('click', (e) => {
-    if (state.selectedAssetIds.length === 0 && !state.selectedAsset) return;
-    if (state.selectedAssetIds.length > 1) {
-      copySelectedPaths();
-      return;
-    }
-    const asset = state.selectedAsset || state.assets.find(a => a.id === state.selectedAssetIds[0]);
-    if (!asset) return;
-    navigator.clipboard.writeText(asset.file_path);
-    const btn = e.currentTarget;
-    const original = btn.innerHTML;
-    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Copied!`;
-    setTimeout(() => { btn.innerHTML = original; }, 1500);
   });
 
   window.api.onAssetAdded(() => debouncedFullRefresh());

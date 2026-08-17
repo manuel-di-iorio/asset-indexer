@@ -124,8 +124,8 @@ export function updateSelectionUI() {
   const favBtn = document.getElementById('bulk-btn-favorite');
   if (favBtn) favBtn.style.display = showBulkExtras ? '' : 'none';
 
-  const openInExplorerBtn = document.getElementById('btn-open-external');
-  if (openInExplorerBtn) openInExplorerBtn.disabled = n > 1;
+  const openInExplorerBtn = document.getElementById('bulk-btn-open-external');
+  if (openInExplorerBtn) openInExplorerBtn.style.display = n === 1 ? '' : 'none';
 
   const grid = document.getElementById('asset-grid');
   if (grid) {
