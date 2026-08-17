@@ -18,44 +18,49 @@ export function updateSelectionUI() {
   if (status) status.textContent = `${n} selected`;
 
   const bulkBar = document.getElementById('bulk-bar');
-  if (bulkBar) bulkBar.style.display = n > 1 ? 'flex' : 'none';
+  if (bulkBar) bulkBar.style.display = n >= 1 ? 'flex' : 'none';
   const bulkCount = document.getElementById('bulk-count');
   if (bulkCount) bulkCount.textContent = `${n} selected`;
 
-  if (n > 1) {
-    const removeTagBtn = document.getElementById('bulk-btn-remove-tag');
-    if (removeTagBtn) {
-      const hasTags = state.assets.some(a => selectedSet.has(a.id) && a.tags);
-      removeTagBtn.style.display = hasTags ? '' : 'none';
-    }
+  const renameBtn = document.getElementById('bulk-btn-rename');
+  if (renameBtn) renameBtn.style.display = n === 1 ? '' : 'none';
 
-    const addTagBtn = document.getElementById('bulk-btn-tag');
-    if (addTagBtn) {
-      const selected = state.assets.filter(a => selectedSet.has(a.id));
-      const hasAddableTag = state.tags.some(tag => selected.some(a => !(a.tags || '').split(',').map(s => s.trim()).includes(tag.name)));
-      addTagBtn.style.display = hasAddableTag ? '' : 'none';
-    }
+  const deleteBtn = document.getElementById('bulk-btn-delete');
+  if (deleteBtn) deleteBtn.textContent = n === 1 ? 'Delete Asset' : `Delete ${n} Assets`;
 
-    const removeColBtn = document.getElementById('bulk-btn-remove-collection');
-    if (removeColBtn) {
-      const hasCollections = state.assets.some(a => selectedSet.has(a.id) && a.collections);
-      removeColBtn.style.display = hasCollections ? '' : 'none';
-    }
+  const copyBtn = document.getElementById('bulk-btn-copy');
+  if (copyBtn) copyBtn.textContent = n === 1 ? 'Copy Path' : 'Copy Paths';
 
-    const addColBtn = document.getElementById('bulk-btn-collection');
-    if (addColBtn) {
-      const selected = state.assets.filter(a => selectedSet.has(a.id));
-      const hasAddableCol = state.collections.some(c => selected.some(a => !(a.collections || '').split(',').map(s => s.trim()).includes(c.name)));
-      addColBtn.style.display = hasAddableCol ? '' : 'none';
-    }
+  const showBulkExtras = n >= 1;
+  const removeTagBtn = document.getElementById('bulk-btn-remove-tag');
+  if (removeTagBtn) removeTagBtn.style.display = showBulkExtras && state.assets.some(a => selectedSet.has(a.id) && a.tags) ? '' : 'none';
+
+  const addTagBtn = document.getElementById('bulk-btn-tag');
+  if (addTagBtn) {
+    const selected = state.assets.filter(a => selectedSet.has(a.id));
+    const hasAddableTag = showBulkExtras && state.tags.some(tag => selected.some(a => !(a.tags || '').split(',').map(s => s.trim()).includes(tag.name)));
+    addTagBtn.style.display = hasAddableTag ? '' : 'none';
   }
 
-  const openBtn = document.getElementById('btn-open-external');
-  if (openBtn) openBtn.disabled = n > 1;
+  const removeColBtn = document.getElementById('bulk-btn-remove-collection');
+  if (removeColBtn) removeColBtn.style.display = showBulkExtras && state.assets.some(a => selectedSet.has(a.id) && a.collections) ? '' : 'none';
+
+  const addColBtn = document.getElementById('bulk-btn-collection');
+  if (addColBtn) {
+    const selected = state.assets.filter(a => selectedSet.has(a.id));
+    const hasAddableCol = showBulkExtras && state.collections.some(c => selected.some(a => !(a.collections || '').split(',').map(s => s.trim()).includes(c.name)));
+    addColBtn.style.display = hasAddableCol ? '' : 'none';
+  }
+
+  const favBtn = document.getElementById('bulk-btn-favorite');
+  if (favBtn) favBtn.style.display = showBulkExtras ? '' : 'none';
+
+  const openInExplorerBtn = document.getElementById('btn-open-external');
+  if (openInExplorerBtn) openInExplorerBtn.disabled = n > 1;
 
   const grid = document.getElementById('asset-grid');
   if (grid) {
-    grid.classList.toggle('has-bulk', n > 1);
+    grid.classList.toggle('has-bulk', n >= 1);
 
     // Compute symmetric difference; batch-update all cards when large changes (selectAll/clear)
     const changed = [...prevSelectedSet, ...selectedSet].filter(

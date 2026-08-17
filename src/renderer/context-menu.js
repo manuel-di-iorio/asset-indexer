@@ -132,7 +132,7 @@ export function showAssetContextMenu(x, y) {
     { type: 'separator' },
     { label: 'Toggle Favorite', icon: ASSET_MENU_ICONS.favorite, action: 'favorite-selected' },
     { type: 'separator' },
-    { label: 'Copy Paths', icon: ASSET_MENU_ICONS.copy, action: 'copy-paths' },
+    { label: n === 1 ? 'Copy Path' : 'Copy Paths', icon: ASSET_MENU_ICONS.copy, action: 'copy-paths' },
     { label: 'Open in File Explorer', icon: ASSET_MENU_ICONS.open, action: 'open-selected', disabled: n > 1 }
   );
   items.push(

@@ -15,6 +15,8 @@ import { showAddCollectionModal } from './modals/add-collection.js';
 import { showAddToCollectionModal } from './modals/add-to-collection.js';
 import { showRemoveTagFromAssetsModal } from './modals/remove-tag-from-assets.js';
 import { showRemoveFromCollectionModal } from './modals/remove-from-collection.js';
+import { showRenameAssetModal } from './modals/rename-asset.js';
+import { showDeleteAssetModal } from './modals/delete-asset.js';
 import { showSettingsModal } from './modals/settings.js';
 
 let searchTimeout = null;
@@ -57,7 +59,8 @@ export function initEventListeners() {
     loadCategoryCounts();
   });
   document.getElementById('bulk-btn-copy').addEventListener('click', copySelectedPaths);
-  document.getElementById('bulk-btn-clear').addEventListener('click', clearSelection);
+  document.getElementById('bulk-btn-rename').addEventListener('click', showRenameAssetModal);
+  document.getElementById('bulk-btn-delete').addEventListener('click', showDeleteAssetModal);
 
   document.getElementById('btn-rescan-all').addEventListener('click', async () => {
     const btn = document.getElementById('btn-rescan-all');
