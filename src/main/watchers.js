@@ -68,6 +68,10 @@ function setupWatcher(db, mainWindow, libraryPath, libraryId, ignoreRegex) {
       has_alpha = excluded.has_alpha
   `);
 
+  const updateStmt = db.prepare(`UPDATE assets SET file_size = ?, modified_date = ?, width = ?, height = ?, bit_depth = ?, has_alpha = ? WHERE file_path = ?`);
+
+  const deleteStmt = db.prepare(`DELETE FROM assets WHERE file_path = ?`);
+
   let addBatch = [];
   let updateBatch = [];
   let removeBatch = [];
@@ -125,10 +129,9 @@ function setupWatcher(db, mainWindow, libraryPath, libraryId, ignoreRegex) {
       ]);
       if (!stat) return;
       const meta = await metadataFor(filePath, category);
-      db.prepare(`UPDATE assets SET file_size = ?, modified_date = ?, width = ?, height = ?, bit_depth = ?, has_alpha = ? WHERE file_path = ?`)
-        .run(stat.size, stat.mtime.toISOString(),
-          meta ? meta[0] : null, meta ? meta[1] : null, meta ? meta[2] : null, meta ? meta[3] : null,
-          filePath);
+      updateStmt.run(stat.size, stat.mtime.toISOString(),
+        meta ? meta[0] : null, meta ? meta[1] : null, meta ? meta[2] : null, meta ? meta[3] : null,
+        filePath);
       updateBatch.push({ filePath });
       scheduleFlush();
     } catch (e) {}
@@ -136,7 +139,7 @@ function setupWatcher(db, mainWindow, libraryPath, libraryId, ignoreRegex) {
 
   watcher.on('unlink', (filePath) => {
     if (ignoredPaths.has(filePath)) return;
-    db.prepare(`DELETE FROM assets WHERE file_path = ?`).run(filePath);
+    deleteStmt.run(filePath);
     removeBatch.push({ filePath });
     scheduleFlush();
   });

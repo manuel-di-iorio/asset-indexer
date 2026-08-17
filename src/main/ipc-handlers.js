@@ -150,7 +150,7 @@ function buildFilterQuery(baseQuery, params, isCount) {
     values.push(`%${params.search}%`);
   }
   if (params.favorites) {
-    conditions.push('a.is_favorite = 1');
+    filterConds.push('a.is_favorite = 1');
   }
   if (params.collectionIds && params.collectionIds.length > 0) {
     filterConds.push(`a.id IN (
@@ -199,6 +199,12 @@ function buildFilterQuery(baseQuery, params, isCount) {
 
   return { query: baseQuery, values };
 }
+
+const CONTENT_IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.ico', '.tiff', '.tif']);
+const CONTENT_AUDIO_EXTS = new Set(['.wav', '.mp3', '.ogg', '.flac', '.aiff', '.aif', '.m4a', '.wma']);
+const CONTENT_VIDEO_EXTS = new Set(['.mp4', '.webm', '.avi', '.mov', '.mkv', '.wmv']);
+const CONTENT_TEXT_EXTS = new Set(['.txt', '.md', '.json', '.xml', '.csv', '.log']);
+const CONTENT_CODE_EXTS = new Set(['.js', '.ts', '.py', '.lua', '.cs', '.cpp', '.h', '.java', '.rs', '.go', '.rb', '.php', '.sh', '.bat', '.ps1']);
 
 function registerIpcHandlers(db, getMainWindow, app) {
   const cacheDir = getThumbCacheDir(app);
@@ -537,13 +543,8 @@ function registerIpcHandlers(db, getMainWindow, app) {
     try {
       const stat = await fs.promises.stat(filePath);
       const ext = path.extname(filePath).toLowerCase();
-      const imageExts = new Set(['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.ico', '.tiff', '.tif']);
-      const audioExts = new Set(['.wav', '.mp3', '.ogg', '.flac', '.aiff', '.aif', '.m4a', '.wma']);
-      const videoExts = new Set(['.mp4', '.webm', '.avi', '.mov', '.mkv', '.wmv']);
-      const textExts = new Set(['.txt', '.md', '.json', '.xml', '.csv', '.log']);
-      const codeExts = new Set(['.js', '.ts', '.py', '.lua', '.cs', '.cpp', '.h', '.java', '.rs', '.go', '.rb', '.php', '.sh', '.bat', '.ps1']);
 
-      if (videoExts.has(ext)) {
+      if (CONTENT_VIDEO_EXTS.has(ext)) {
         const fileUrl = 'file:///' + filePath.replace(/\\/g, '/');
         if (stat.size > 500 * 1024 * 1024) return { error: 'File too large' };
         return { type: 'video', data: fileUrl };
@@ -551,7 +552,7 @@ function registerIpcHandlers(db, getMainWindow, app) {
 
       if (stat.size > 5 * 1024 * 1024) return { error: 'File too large' };
 
-      if (imageExts.has(ext)) {
+      if (CONTENT_IMAGE_EXTS.has(ext)) {
         const data = await fs.promises.readFile(filePath);
         const mimeMap = {
           '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
@@ -576,7 +577,7 @@ function registerIpcHandlers(db, getMainWindow, app) {
         }
         return { type: 'image', data: `data:${mimeMap[ext] || 'image/png'};base64,${data.toString('base64')}`, width, height };
       }
-      if (audioExts.has(ext)) {
+      if (CONTENT_AUDIO_EXTS.has(ext)) {
         const data = await fs.promises.readFile(filePath);
         const mimeMap = {
           '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg',
@@ -585,11 +586,11 @@ function registerIpcHandlers(db, getMainWindow, app) {
         };
         return { type: 'audio', data: `data:${mimeMap[ext] || 'audio/wav'};base64,${data.toString('base64')}` };
       }
-      if (textExts.has(ext)) {
+      if (CONTENT_TEXT_EXTS.has(ext)) {
         const content = await fs.promises.readFile(filePath, 'utf-8');
         return { type: 'text', data: content.substring(0, 50000) };
       }
-      if (codeExts.has(ext)) {
+      if (CONTENT_CODE_EXTS.has(ext)) {
         const content = await fs.promises.readFile(filePath, 'utf-8');
         return { type: 'code', data: content.substring(0, 50000), language: ext.slice(1) };
       }

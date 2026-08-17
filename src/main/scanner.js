@@ -115,13 +115,22 @@ function pruneStaleAssets(db, libraryId, existingPaths) {
     db.prepare('DELETE FROM assets WHERE library_id = ?').run(libraryId);
     return count;
   }
-  const placeholders = existingPaths.map(() => '?').join(',');
-  const stale = db.prepare(`SELECT id FROM assets WHERE library_id = ? AND file_path NOT IN (${placeholders})`).all(libraryId, ...existingPaths);
-  if (stale.length === 0) return 0;
-  const staleIds = stale.map(r => r.id);
-  const idPlaceholders = staleIds.map(() => '?').join(',');
-  db.prepare(`DELETE FROM assets WHERE id IN (${idPlaceholders})`).run(...staleIds);
-  return staleIds.length;
+  const CHUNK = 900;
+  let totalDeleted = 0;
+  for (let i = 0; i < existingPaths.length; i += CHUNK) {
+    const chunk = existingPaths.slice(i, i + CHUNK);
+    const placeholders = chunk.map(() => '?').join(',');
+    const stale = db.prepare(`SELECT id FROM assets WHERE library_id = ? AND file_path NOT IN (${placeholders})`).all(libraryId, ...chunk);
+    if (stale.length === 0) continue;
+    const staleIds = stale.map(r => r.id);
+    for (let j = 0; j < staleIds.length; j += CHUNK) {
+      const idChunk = staleIds.slice(j, j + CHUNK);
+      const idPlaceholders = idChunk.map(() => '?').join(',');
+      db.prepare(`DELETE FROM assets WHERE id IN (${idPlaceholders})`).run(...idChunk);
+    }
+    totalDeleted += staleIds.length;
+  }
+  return totalDeleted;
 }
 
 module.exports = { scanDirectory, getAllFiles, pruneStaleAssets };

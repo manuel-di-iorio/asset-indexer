@@ -1,7 +1,7 @@
 import { state } from '../state.js';
 import { escapeHtml, getCategoryFromExt } from '../utils.js';
 import { CATEGORY_ICONS, CATEGORY_COLORS, CATEGORY_LABELS } from '../constants.js';
-import { selectSingle, toggleSelect, rangeSelect, syncSelectionCache, registerCardElement, clearCardElementMap } from '../selection.js';
+import { selectSingle, toggleSelect, rangeSelect, syncSelectionCache, registerCardElement, clearCardElementMap, rebuildIdIndexMap } from '../selection.js';
 import { showAssetContextMenu } from '../context-menu.js';
 import { loadMoreAssets } from '../api.js';
 
@@ -9,8 +9,8 @@ let thumbObserver = null;
 let thumbnailCache = {};
 let thumbRafPending = false;
 let thumbScrollHandler = null;
-let renderedCount = 0;
 let gridDelegationSetup = false;
+const renderedCards = new Map();
 
 function placeholderHTML(color, icon) {
   return `<div class="thumb-placeholder" style="color: ${color}">${icon}</div>`;
@@ -127,7 +127,7 @@ function maybeLoadMore() {
   if (grid.classList.contains('rubber-dragging')) return;
   if (grid.scrollTop + grid.clientHeight >= grid.scrollHeight - 800) {
     loadMoreAssets().then(() => {
-      appendMoreAssets();
+      renderAssets();
       maybeLoadMore();
     });
   }
@@ -168,15 +168,6 @@ function setupGridDelegation() {
   });
 }
 
-function appendCards() {
-  const grid = document.getElementById('asset-grid');
-  const frag = document.createDocumentFragment();
-  const slice = state.assets.slice(renderedCount);
-  slice.forEach(asset => frag.appendChild(buildCard(asset)));
-  renderedCount = state.assets.length;
-  grid.appendChild(frag);
-}
-
 export function renderAssets() {
   const grid = document.getElementById('asset-grid');
   const emptyState = document.getElementById('empty-state');
@@ -184,30 +175,46 @@ export function renderAssets() {
   if (state.assets.length === 0) {
     grid.innerHTML = '';
     emptyState.style.display = 'flex';
-    renderedCount = 0;
     clearCardElementMap();
+    renderedCards.clear();
     syncSelectionCache();
     return;
   }
 
   emptyState.style.display = 'none';
-  grid.innerHTML = '';
-  renderedCount = 0;
-  clearCardElementMap();
-  appendCards();
   grid.classList.toggle('list-view', state.viewMode === 'list');
   setupGridDelegation();
-  syncSelectionCache();
 
+  const newIds = new Set(state.assets.map(a => a.id));
+  const frag = document.createDocumentFragment();
+  let changed = false;
+
+  for (const [id, card] of renderedCards) {
+    if (!newIds.has(id)) {
+      card.remove();
+      renderedCards.delete(id);
+      changed = true;
+    }
+  }
+
+  for (const asset of state.assets) {
+    if (!renderedCards.has(asset.id)) {
+      const card = buildCard(asset);
+      renderedCards.set(asset.id, card);
+      frag.appendChild(card);
+      changed = true;
+    }
+  }
+
+  if (changed) grid.appendChild(frag);
+
+  rebuildIdIndexMap();
+  syncSelectionCache();
   loadThumbnailsForVisible();
   setupThumbnailObserver();
   maybeLoadMore();
 }
 
 export function appendMoreAssets() {
-  const grid = document.getElementById('asset-grid');
-  if (!grid || renderedCount >= state.assets.length) return;
-  appendCards();
-  loadThumbnailsForVisible();
-  setupThumbnailObserver();
+  renderAssets();
 }
