@@ -52,4 +52,7 @@ contextBridge.exposeInMainWorld('api', {
   onAssetAdded: (cb) => ipcRenderer.on('asset-added', (e, data) => cb(data)),
   onAssetUpdated: (cb) => ipcRenderer.on('asset-updated', (e, data) => cb(data)),
   onAssetRemoved: (cb) => ipcRenderer.on('asset-removed', (e, data) => cb(data)),
+  onAssetsBatchAdded: (cb) => ipcRenderer.on('assets-batch-added', (e, data) => cb(data)),
+  onAssetsBatchUpdated: (cb) => ipcRenderer.on('assets-batch-updated', (e, data) => cb(data)),
+  onAssetsBatchRemoved: (cb) => ipcRenderer.on('assets-batch-removed', (e, data) => cb(data)),
 });

@@ -6,6 +6,28 @@ let anchorId = null;
 let prevSelectedSet = new Set();
 let prevFocusedId = null;
 
+const cardElementMap = new Map();
+let cachedGridCols = 1;
+let lastGridWidth = 0;
+let idIndexMap = new Map();
+
+export function rebuildIdIndexMap() {
+  idIndexMap.clear();
+  state.assets.forEach((a, i) => idIndexMap.set(a.id, i));
+}
+
+export function registerCardElement(id, el) {
+  cardElementMap.set(id, el);
+}
+
+export function unregisterCardElement(id) {
+  cardElementMap.delete(id);
+}
+
+export function clearCardElementMap() {
+  cardElementMap.clear();
+}
+
 export function getSelectedIds() {
   return state.selectedAssetIds;
 }
@@ -32,23 +54,70 @@ export function updateSelectionUI() {
   if (copyBtn) copyBtn.textContent = n === 1 ? 'Copy Path' : 'Copy Paths';
 
   const showBulkExtras = n >= 1;
+
   const removeTagBtn = document.getElementById('bulk-btn-remove-tag');
-  if (removeTagBtn) removeTagBtn.style.display = showBulkExtras && state.assets.some(a => selectedSet.has(a.id) && a.tags) ? '' : 'none';
+  if (removeTagBtn) {
+    let hasRemovableTag = false;
+    if (showBulkExtras) {
+      for (const asset of state.assets) {
+        if (selectedSet.has(asset.id) && asset.tags) { hasRemovableTag = true; break; }
+      }
+    }
+    removeTagBtn.style.display = hasRemovableTag ? '' : 'none';
+  }
 
   const addTagBtn = document.getElementById('bulk-btn-tag');
   if (addTagBtn) {
-    const selected = state.assets.filter(a => selectedSet.has(a.id));
-    const hasAddableTag = showBulkExtras && state.tags.some(tag => selected.some(a => !(a.tags || '').split(',').map(s => s.trim()).includes(tag.name)));
+    let hasAddableTag = false;
+    if (showBulkExtras && state.tags.length > 0) {
+      const selectedAssets = [];
+      for (const asset of state.assets) {
+        if (selectedSet.has(asset.id)) selectedAssets.push(asset);
+      }
+      const tagSets = selectedAssets.map(a => {
+        const tags = a.tags || '';
+        return tags ? new Set(tags.split(',').map(s => s.trim())) : new Set();
+      });
+      addTagLoop:
+      for (const tag of state.tags) {
+        for (const ts of tagSets) {
+          if (!ts.has(tag.name)) { hasAddableTag = true; break addTagLoop; }
+        }
+      }
+    }
     addTagBtn.style.display = hasAddableTag ? '' : 'none';
   }
 
   const removeColBtn = document.getElementById('bulk-btn-remove-collection');
-  if (removeColBtn) removeColBtn.style.display = showBulkExtras && state.assets.some(a => selectedSet.has(a.id) && a.collections) ? '' : 'none';
+  if (removeColBtn) {
+    let hasRemovableCol = false;
+    if (showBulkExtras) {
+      for (const asset of state.assets) {
+        if (selectedSet.has(asset.id) && asset.collections) { hasRemovableCol = true; break; }
+      }
+    }
+    removeColBtn.style.display = hasRemovableCol ? '' : 'none';
+  }
 
   const addColBtn = document.getElementById('bulk-btn-collection');
   if (addColBtn) {
-    const selected = state.assets.filter(a => selectedSet.has(a.id));
-    const hasAddableCol = showBulkExtras && state.collections.some(c => selected.some(a => !(a.collections || '').split(',').map(s => s.trim()).includes(c.name)));
+    let hasAddableCol = false;
+    if (showBulkExtras && state.collections.length > 0) {
+      const selectedAssets = [];
+      for (const asset of state.assets) {
+        if (selectedSet.has(asset.id)) selectedAssets.push(asset);
+      }
+      const colSets = selectedAssets.map(a => {
+        const cols = a.collections || '';
+        return cols ? new Set(cols.split(',').map(s => s.trim())) : new Set();
+      });
+      addColLoop:
+      for (const col of state.collections) {
+        for (const cs of colSets) {
+          if (!cs.has(col.name)) { hasAddableCol = true; break addColLoop; }
+        }
+      }
+    }
     addColBtn.style.display = hasAddableCol ? '' : 'none';
   }
 
@@ -62,28 +131,26 @@ export function updateSelectionUI() {
   if (grid) {
     grid.classList.toggle('has-bulk', n >= 1);
 
-    // Compute symmetric difference; batch-update all cards when large changes (selectAll/clear)
     const changed = [...prevSelectedSet, ...selectedSet].filter(
       id => prevSelectedSet.has(id) !== selectedSet.has(id)
     );
     if (changed.length > 50) {
-      grid.querySelectorAll('.asset-card').forEach(card => {
-        const id = parseInt(card.dataset.id);
+      for (const [id, card] of cardElementMap) {
         card.classList.toggle('selected', selectedSet.has(id));
         card.classList.toggle('focused', id === state.focusedAssetId);
-      });
+      }
     } else {
       changed.forEach(id => {
-        const card = grid.querySelector(`.asset-card[data-id="${id}"]`);
+        const card = cardElementMap.get(id);
         if (card) card.classList.toggle('selected', selectedSet.has(id));
       });
       if (prevFocusedId !== state.focusedAssetId) {
         if (prevFocusedId !== null) {
-          const prev = grid.querySelector(`.asset-card[data-id="${prevFocusedId}"]`);
+          const prev = cardElementMap.get(prevFocusedId);
           if (prev) prev.classList.remove('focused');
         }
         if (state.focusedAssetId !== null) {
-          const next = grid.querySelector(`.asset-card[data-id="${state.focusedAssetId}"]`);
+          const next = cardElementMap.get(state.focusedAssetId);
           if (next) next.classList.add('focused');
         }
       }
@@ -145,22 +212,23 @@ export async function toggleSelect(id) {
 }
 
 export async function rangeSelect(id) {
-  const list = state.assets.map(a => a.id);
-  const end = list.indexOf(id);
-  if (end < 0) { await selectSingle(id); return; }
+  if (idIndexMap.size === 0) rebuildIdIndexMap();
+  const end = idIndexMap.get(id);
+  if (end === undefined) { await selectSingle(id); return; }
 
   let anchor = anchorId;
-  if (anchor === null || !list.includes(anchor)) {
-    anchor = state.focusedAssetId !== null && list.includes(state.focusedAssetId)
+  if (anchor === null || !idIndexMap.has(anchor)) {
+    anchor = state.focusedAssetId !== null && idIndexMap.has(state.focusedAssetId)
       ? state.focusedAssetId
       : (state.selectedAssetIds.length ? state.selectedAssetIds[state.selectedAssetIds.length - 1] : null);
   }
   if (anchor === null) { await selectSingle(id); return; }
 
-  const anchorIdx = list.indexOf(anchor);
+  const anchorIdx = idIndexMap.get(anchor);
+  if (anchorIdx === undefined) { await selectSingle(id); return; }
   const from = Math.min(anchorIdx, end);
   const to = Math.max(anchorIdx, end);
-  state.selectedAssetIds = list.slice(from, to + 1);
+  state.selectedAssetIds = state.assets.slice(from, to + 1).map(a => a.id);
   state.focusedAssetId = id;
   await syncSelection();
 }
@@ -200,15 +268,18 @@ export function clearSelection() {
 export function moveSelection(dx, dy, extend = false) {
   const list = state.assets;
   if (list.length === 0) return;
-  const ids = list.map(a => a.id);
 
-  let idx = state.focusedAssetId !== null && ids.includes(state.focusedAssetId)
-    ? ids.indexOf(state.focusedAssetId)
-    : (state.selectedAssetIds.length ? ids.indexOf(state.selectedAssetIds[state.selectedAssetIds.length - 1]) : -1);
+  if (idIndexMap.size === 0) rebuildIdIndexMap();
+
+  let idx = state.focusedAssetId !== null && idIndexMap.has(state.focusedAssetId)
+    ? idIndexMap.get(state.focusedAssetId)
+    : (state.selectedAssetIds.length ? idIndexMap.get(state.selectedAssetIds[state.selectedAssetIds.length - 1]) : -1);
+
+  if (idx === undefined) idx = -1;
 
   if (idx < 0) {
-    if (extend) rangeSelect(ids[0]);
-    else selectSingle(ids[0]);
+    if (extend) rangeSelect(list[0].id);
+    else selectSingle(list[0].id);
     return;
   }
 
@@ -225,26 +296,28 @@ export function moveSelection(dx, dy, extend = false) {
     if (dy !== 0) idx += dy * cols;
   }
 
-  idx = Math.max(0, Math.min(ids.length - 1, idx));
+  idx = Math.max(0, Math.min(list.length - 1, idx));
   if (idx === startIdx && !extend) return;
 
-  const targetId = ids[idx];
+  const targetId = list[idx].id;
 
   if (extend) rangeSelect(targetId);
   else selectSingle(targetId);
 
-  const card = grid ? grid.querySelector(`.asset-card[data-id="${targetId}"]`) : null;
+  const card = cardElementMap.get(targetId);
   if (card) card.scrollIntoView({ block: 'nearest' });
 }
 
-function getGridColumns(grid) {
+export function getGridColumns(grid) {
   if (!grid) return 1;
-  const cards = grid.querySelectorAll('.asset-card');
-  if (cards.length < 2) return 1;
-  const firstTop = cards[0].offsetTop;
-  let cols = 1;
-  while (cols < cards.length && cards[cols].offsetTop === firstTop) cols++;
-  return cols;
+  const gridWidth = grid.clientWidth - 40;
+  if (gridWidth === lastGridWidth) return cachedGridCols;
+  lastGridWidth = gridWidth;
+  const isList = grid.classList.contains('list-view');
+  if (isList) { cachedGridCols = 1; return 1; }
+  const minCardWidth = 180 + 14;
+  cachedGridCols = Math.max(1, Math.floor((gridWidth + 14) / minCardWidth));
+  return cachedGridCols;
 }
 
 export function removeSelectedId(removedId) {

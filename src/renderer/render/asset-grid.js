@@ -1,7 +1,7 @@
 import { state } from '../state.js';
 import { escapeHtml, getCategoryFromExt } from '../utils.js';
 import { CATEGORY_ICONS, CATEGORY_COLORS, CATEGORY_LABELS } from '../constants.js';
-import { selectSingle, toggleSelect, rangeSelect, syncSelectionCache } from '../selection.js';
+import { selectSingle, toggleSelect, rangeSelect, syncSelectionCache, registerCardElement, clearCardElementMap } from '../selection.js';
 import { showAssetContextMenu } from '../context-menu.js';
 import { loadMoreAssets } from '../api.js';
 
@@ -10,6 +10,7 @@ let thumbnailCache = {};
 let thumbRafPending = false;
 let thumbScrollHandler = null;
 let renderedCount = 0;
+let gridDelegationSetup = false;
 
 function placeholderHTML(color, icon) {
   return `<div class="thumb-placeholder" style="color: ${color}">${icon}</div>`;
@@ -69,7 +70,12 @@ function loadThumbnailsForVisible() {
       if (!isVisible) return;
       const path = container.dataset.thumbPath;
       if (thumbnailCache[path]) {
-        container.innerHTML = `<img class="card-thumb-img" src="${thumbnailCache[path]}" alt="" loading="lazy">`;
+        const img = document.createElement('img');
+        img.className = 'card-thumb-img';
+        img.src = thumbnailCache[path];
+        img.alt = '';
+        img.loading = 'lazy';
+        container.replaceChildren(img);
         container.removeAttribute('data-thumb-path');
       } else {
         paths.push(path);
@@ -84,7 +90,12 @@ function loadThumbnailsForVisible() {
       containerMap.forEach((container, i) => {
         const thumb = results[paths[i]];
         if (thumb) {
-          container.innerHTML = `<img class="card-thumb-img" src="${thumb}" alt="" loading="lazy">`;
+          const img = document.createElement('img');
+          img.className = 'card-thumb-img';
+          img.src = thumb;
+          img.alt = '';
+          img.loading = 'lazy';
+          container.replaceChildren(img);
           container.removeAttribute('data-thumb-path');
         }
       });
@@ -128,14 +139,14 @@ function buildCard(asset) {
   const el = temp.firstElementChild;
   if (state.selectedAssetIds.includes(asset.id)) el.classList.add('selected');
   if (asset.id === state.focusedAssetId) el.classList.add('focused');
+  registerCardElement(asset.id, el);
   return el;
 }
 
-// Single delegated listener instead of one per card
 function setupGridDelegation() {
+  if (gridDelegationSetup) return;
+  gridDelegationSetup = true;
   const grid = document.getElementById('asset-grid');
-  if (!grid || grid._delegated) return;
-  grid._delegated = true;
 
   grid.addEventListener('click', (e) => {
     const card = e.target.closest('.asset-card');
@@ -174,6 +185,7 @@ export function renderAssets() {
     grid.innerHTML = '';
     emptyState.style.display = 'flex';
     renderedCount = 0;
+    clearCardElementMap();
     syncSelectionCache();
     return;
   }
@@ -181,6 +193,7 @@ export function renderAssets() {
   emptyState.style.display = 'none';
   grid.innerHTML = '';
   renderedCount = 0;
+  clearCardElementMap();
   appendCards();
   grid.classList.toggle('list-view', state.viewMode === 'list');
   setupGridDelegation();

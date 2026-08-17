@@ -10,6 +10,9 @@ const { detectLicense } = require('./license');
 
 const THUMB_CACHE_DIR = null;
 
+const thumbBase64Cache = new Map();
+const THUMB_MEMORY_CACHE_LIMIT = 2000;
+
 function getThumbCacheDir(app) {
   if (!THUMB_CACHE_DIR) {
     const dir = path.join(app.getPath('userData'), 'thumbnails');
@@ -25,11 +28,20 @@ function getThumbCachePath(filePath, cacheDir) {
 }
 
 function getCachedThumbnail(filePath, cacheDir) {
+  const cached = thumbBase64Cache.get(filePath);
+  if (cached) return cached;
+
   const thumbPath = getThumbCachePath(filePath, cacheDir);
   if (fs.existsSync(thumbPath)) {
     try {
       const data = fs.readFileSync(thumbPath);
-      return `data:image/jpeg;base64,${data.toString('base64')}`;
+      const b64 = `data:image/jpeg;base64,${data.toString('base64')}`;
+      if (thumbBase64Cache.size >= THUMB_MEMORY_CACHE_LIMIT) {
+        const firstKey = thumbBase64Cache.keys().next().value;
+        thumbBase64Cache.delete(firstKey);
+      }
+      thumbBase64Cache.set(filePath, b64);
+      return b64;
     } catch (e) {}
   }
   return null;
@@ -67,17 +79,32 @@ function generateThumbnail(filePath, cacheDir) {
           const pngBuf = target.toPNG();
           const thumbPath = getThumbCachePath(filePath, cacheDir);
           fs.writeFileSync(thumbPath, pngBuf);
-          return `data:image/png;base64,${pngBuf.toString('base64')}`;
+          const b64 = `data:image/png;base64,${pngBuf.toString('base64')}`;
+          if (thumbBase64Cache.size >= THUMB_MEMORY_CACHE_LIMIT) {
+            const firstKey = thumbBase64Cache.keys().next().value;
+            thumbBase64Cache.delete(firstKey);
+          }
+          thumbBase64Cache.set(filePath, b64);
+          return b64;
         }
       }
     }
 
     if (size.width <= 200 && size.height <= 200) return toFileUrl(filePath);
 
-    const pngBuf = img.resize({ width: 200, quality: 'good' }).toPNG();
+    const resized = img.resize({ width: 200, quality: 'good' });
+    const imageExts = new Set(['.png', '.gif', '.webp', '.ico', '.tga', '.psd', '.dds', '.ktx', '.bmp']);
+    const buf = imageExts.has(ext) ? resized.toPNG() : resized.toJPEG(85);
     const thumbPath = getThumbCachePath(filePath, cacheDir);
-    fs.writeFileSync(thumbPath, pngBuf);
-    return `data:image/png;base64,${pngBuf.toString('base64')}`;
+    fs.writeFileSync(thumbPath, buf);
+    const mime = imageExts.has(ext) ? 'image/png' : 'image/jpeg';
+    const b64 = `data:${mime};base64,${buf.toString('base64')}`;
+    if (thumbBase64Cache.size >= THUMB_MEMORY_CACHE_LIMIT) {
+      const firstKey = thumbBase64Cache.keys().next().value;
+      thumbBase64Cache.delete(firstKey);
+    }
+    thumbBase64Cache.set(filePath, b64);
+    return b64;
   } catch (e) {
     console.warn('Thumbnail generation failed for', filePath, e.message);
     return null;
@@ -103,6 +130,74 @@ function getCachedCategoryCounts(db) {
 function getCachedTotalAssets(db) {
   if (!countCache.dirty && countCache.data) return db.prepare('SELECT COUNT(*) as count FROM assets').get().count;
   return db.prepare('SELECT COUNT(*) as count FROM assets').get().count;
+}
+
+function buildFilterQuery(baseQuery, params, isCount) {
+  const conditions = [];
+  const filterConds = [];
+  const values = [];
+
+  if (params.libraryIds && params.libraryIds.length > 0) {
+    filterConds.push(`a.library_id IN (${params.libraryIds.map(() => '?').join(',')})`);
+    values.push(...params.libraryIds);
+  }
+  if (params.categories && params.categories.length > 0) {
+    filterConds.push(`a.category IN (${params.categories.map(() => '?').join(',')})`);
+    values.push(...params.categories);
+  }
+  if (params.search) {
+    conditions.push('a.file_name LIKE ?');
+    values.push(`%${params.search}%`);
+  }
+  if (params.favorites) {
+    conditions.push('a.is_favorite = 1');
+  }
+  if (params.collectionIds && params.collectionIds.length > 0) {
+    filterConds.push(`a.id IN (
+      SELECT DISTINCT asset_id FROM asset_collections WHERE collection_id IN (${params.collectionIds.map(() => '?').join(',')})
+    )`);
+    values.push(...params.collectionIds);
+  }
+  if (params.tagIds && params.tagIds.length > 0) {
+    filterConds.push(`a.id IN (
+      SELECT DISTINCT asset_id FROM asset_tags WHERE tag_id IN (${params.tagIds.map(() => '?').join(',')})
+    )`);
+    values.push(...params.tagIds);
+  }
+  if (filterConds.length > 0) conditions.push('(' + filterConds.join(' OR ') + ')');
+
+  if (conditions.length > 0) {
+    baseQuery += ' WHERE ' + conditions.join(' AND ');
+  }
+
+  if (!isCount) {
+    baseQuery += ' GROUP BY a.id';
+    if (params.sort) {
+      switch (params.sort) {
+        case 'name': baseQuery += ' ORDER BY a.file_name COLLATE NOCASE ASC, a.id ASC'; break;
+        case 'size': baseQuery += ' ORDER BY a.file_size DESC, a.id DESC'; break;
+        case 'modified': baseQuery += ' ORDER BY a.modified_date DESC, a.id DESC'; break;
+        case 'created': baseQuery += ' ORDER BY a.created_date DESC, a.id DESC'; break;
+        case 'type': baseQuery += ' ORDER BY a.file_ext ASC, a.file_name COLLATE NOCASE ASC, a.id ASC'; break;
+        default: baseQuery += ' ORDER BY a.file_name COLLATE NOCASE ASC, a.id ASC';
+      }
+    } else {
+      baseQuery += ' ORDER BY a.file_name COLLATE NOCASE ASC, a.id ASC';
+    }
+
+    if (params.limit) {
+      const limit = Math.min(Math.max(parseInt(params.limit) || 50, 1), 1000);
+      baseQuery += ' LIMIT ?';
+      values.push(limit);
+    }
+    if (params.offset) {
+      const offset = Math.max(parseInt(params.offset) || 0, 0);
+      baseQuery += ' OFFSET ?';
+      values.push(offset);
+    }
+  }
+
+  return { query: baseQuery, values };
 }
 
 function registerIpcHandlers(db, getMainWindow, app) {
@@ -180,7 +275,7 @@ function registerIpcHandlers(db, getMainWindow, app) {
   });
 
   ipcMain.handle('get-assets', (event, params) => {
-    let query = `SELECT a.*,
+    const base = `SELECT a.*,
       GROUP_CONCAT(DISTINCT t.name) as tags,
       GROUP_CONCAT(DISTINCT t.color) as tag_colors,
       GROUP_CONCAT(DISTINCT c.name) as collections
@@ -189,111 +284,13 @@ function registerIpcHandlers(db, getMainWindow, app) {
     LEFT JOIN tags t ON at.tag_id = t.id
     LEFT JOIN asset_collections ac ON a.id = ac.asset_id
     LEFT JOIN collections c ON ac.collection_id = c.id`;
-    const conditions = [];
-    const filterConds = [];
-    const values = [];
-
-    if (params.libraryIds && params.libraryIds.length > 0) {
-      filterConds.push(`a.library_id IN (${params.libraryIds.map(() => '?').join(',')})`);
-      values.push(...params.libraryIds);
-    }
-    if (params.categories && params.categories.length > 0) {
-      filterConds.push(`a.category IN (${params.categories.map(() => '?').join(',')})`);
-      values.push(...params.categories);
-    }
-    if (params.search) {
-      conditions.push('a.file_name LIKE ?');
-      values.push(`%${params.search}%`);
-    }
-    if (params.favorites) {
-      conditions.push('a.is_favorite = 1');
-    }
-    if (params.collectionIds && params.collectionIds.length > 0) {
-      filterConds.push(`a.id IN (
-        SELECT DISTINCT asset_id FROM asset_collections WHERE collection_id IN (${params.collectionIds.map(() => '?').join(',')})
-      )`);
-      values.push(...params.collectionIds);
-    }
-    if (params.tagIds && params.tagIds.length > 0) {
-      filterConds.push(`a.id IN (
-        SELECT DISTINCT asset_id FROM asset_tags WHERE tag_id IN (${params.tagIds.map(() => '?').join(',')})
-      )`);
-      values.push(...params.tagIds);
-    }
-    if (filterConds.length > 0) conditions.push('(' + filterConds.join(' OR ') + ')');
-
-    if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ');
-    }
-
-    query += ' GROUP BY a.id';
-
-    if (params.sort) {
-      switch (params.sort) {
-        case 'name': query += ' ORDER BY a.file_name COLLATE NOCASE ASC, a.id ASC'; break;
-        case 'size': query += ' ORDER BY a.file_size DESC, a.id DESC'; break;
-        case 'modified': query += ' ORDER BY a.modified_date DESC, a.id DESC'; break;
-        case 'created': query += ' ORDER BY a.created_date DESC, a.id DESC'; break;
-        case 'type': query += ' ORDER BY a.file_ext ASC, a.file_name COLLATE NOCASE ASC, a.id ASC'; break;
-        default: query += ' ORDER BY a.file_name COLLATE NOCASE ASC, a.id ASC';
-      }
-    } else {
-      query += ' ORDER BY a.file_name COLLATE NOCASE ASC, a.id ASC';
-    }
-
-    if (params.limit) {
-      const limit = Math.min(Math.max(parseInt(params.limit) || 50, 1), 1000);
-      query += ' LIMIT ?';
-      values.push(limit);
-    }
-    if (params.offset) {
-      const offset = Math.max(parseInt(params.offset) || 0, 0);
-      query += ' OFFSET ?';
-      values.push(offset);
-    }
-
+    const { query, values } = buildFilterQuery(base, params, false);
     return db.prepare(query).all(...values);
   });
 
   ipcMain.handle('get-asset-count', (event, params) => {
-    let query = 'SELECT COUNT(*) as count FROM assets a';
-    const conditions = [];
-    const filterConds = [];
-    const values = [];
-
-    if (params.libraryIds && params.libraryIds.length > 0) {
-      filterConds.push(`a.library_id IN (${params.libraryIds.map(() => '?').join(',')})`);
-      values.push(...params.libraryIds);
-    }
-    if (params.categories && params.categories.length > 0) {
-      filterConds.push(`a.category IN (${params.categories.map(() => '?').join(',')})`);
-      values.push(...params.categories);
-    }
-    if (params.search) {
-      conditions.push('a.file_name LIKE ?');
-      values.push(`%${params.search}%`);
-    }
-    if (params.favorites) {
-      conditions.push('a.is_favorite = 1');
-    }
-    if (params.collectionIds && params.collectionIds.length > 0) {
-      filterConds.push(`a.id IN (
-        SELECT DISTINCT asset_id FROM asset_collections WHERE collection_id IN (${params.collectionIds.map(() => '?').join(',')})
-      )`);
-      values.push(...params.collectionIds);
-    }
-    if (params.tagIds && params.tagIds.length > 0) {
-      filterConds.push(`a.id IN (
-        SELECT DISTINCT asset_id FROM asset_tags WHERE tag_id IN (${params.tagIds.map(() => '?').join(',')})
-      )`);
-      values.push(...params.tagIds);
-    }
-    if (filterConds.length > 0) conditions.push('(' + filterConds.join(' OR ') + ')');
-
-    if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ');
-    }
-
+    const base = 'SELECT COUNT(*) as count FROM assets a';
+    const { query, values } = buildFilterQuery(base, params, true);
     return db.prepare(query).get(...values).count;
   });
 
@@ -407,6 +404,7 @@ function registerIpcHandlers(db, getMainWindow, app) {
       ignorePath(newPath);
       fs.renameSync(asset.file_path, newPath);
       try { fs.unlinkSync(getThumbCachePath(asset.file_path, cacheDir)); } catch (e) {}
+      thumbBase64Cache.delete(asset.file_path);
       db.prepare('UPDATE assets SET file_path = ?, file_name = ?, file_ext = ?, category = ? WHERE id = ?')
         .run(newPath, cleanName, ext, category, assetId);
       invalidateCountCache();
@@ -435,6 +433,7 @@ function registerIpcHandlers(db, getMainWindow, app) {
         continue;
       }
       try { fs.unlinkSync(getThumbCachePath(row.file_path, cacheDir)); } catch (e) {}
+      thumbBase64Cache.delete(row.file_path);
       delTags.run(id);
       delCols.run(id);
       delAsset.run(id);
@@ -536,13 +535,15 @@ function registerIpcHandlers(db, getMainWindow, app) {
 
   ipcMain.handle('get-file-content', async (event, filePath) => {
     try {
-      const stat = fs.statSync(filePath);
+      const stat = await fs.promises.stat(filePath);
       const ext = path.extname(filePath).toLowerCase();
-      const imageExts = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.ico', '.tiff', '.tif'];
-      const audioExts = ['.wav', '.mp3', '.ogg', '.flac', '.aiff', '.aif', '.m4a', '.wma'];
-      const videoExts = ['.mp4', '.webm', '.avi', '.mov', '.mkv', '.wmv'];
+      const imageExts = new Set(['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.ico', '.tiff', '.tif']);
+      const audioExts = new Set(['.wav', '.mp3', '.ogg', '.flac', '.aiff', '.aif', '.m4a', '.wma']);
+      const videoExts = new Set(['.mp4', '.webm', '.avi', '.mov', '.mkv', '.wmv']);
+      const textExts = new Set(['.txt', '.md', '.json', '.xml', '.csv', '.log']);
+      const codeExts = new Set(['.js', '.ts', '.py', '.lua', '.cs', '.cpp', '.h', '.java', '.rs', '.go', '.rb', '.php', '.sh', '.bat', '.ps1']);
 
-      if (videoExts.includes(ext)) {
+      if (videoExts.has(ext)) {
         const fileUrl = 'file:///' + filePath.replace(/\\/g, '/');
         if (stat.size > 500 * 1024 * 1024) return { error: 'File too large' };
         return { type: 'video', data: fileUrl };
@@ -550,8 +551,8 @@ function registerIpcHandlers(db, getMainWindow, app) {
 
       if (stat.size > 5 * 1024 * 1024) return { error: 'File too large' };
 
-      if (imageExts.includes(ext)) {
-        const data = fs.readFileSync(filePath);
+      if (imageExts.has(ext)) {
+        const data = await fs.promises.readFile(filePath);
         const mimeMap = {
           '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
           '.gif': 'image/gif', '.bmp': 'image/bmp', '.webp': 'image/webp',
@@ -575,8 +576,8 @@ function registerIpcHandlers(db, getMainWindow, app) {
         }
         return { type: 'image', data: `data:${mimeMap[ext] || 'image/png'};base64,${data.toString('base64')}`, width, height };
       }
-      if (audioExts.includes(ext)) {
-        const data = fs.readFileSync(filePath);
+      if (audioExts.has(ext)) {
+        const data = await fs.promises.readFile(filePath);
         const mimeMap = {
           '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg',
           '.flac': 'audio/flac', '.aiff': 'audio/aiff', '.aif': 'audio/aiff',
@@ -584,12 +585,12 @@ function registerIpcHandlers(db, getMainWindow, app) {
         };
         return { type: 'audio', data: `data:${mimeMap[ext] || 'audio/wav'};base64,${data.toString('base64')}` };
       }
-      if (ext === '.txt' || ext === '.md' || ext === '.json' || ext === '.xml' || ext === '.csv' || ext === '.log') {
-        const content = fs.readFileSync(filePath, 'utf-8');
+      if (textExts.has(ext)) {
+        const content = await fs.promises.readFile(filePath, 'utf-8');
         return { type: 'text', data: content.substring(0, 50000) };
       }
-      if (['.js', '.ts', '.py', '.lua', '.cs', '.cpp', '.h', '.java', '.rs', '.go', '.rb', '.php', '.sh', '.bat', '.ps1'].includes(ext)) {
-        const content = fs.readFileSync(filePath, 'utf-8');
+      if (codeExts.has(ext)) {
+        const content = await fs.promises.readFile(filePath, 'utf-8');
         return { type: 'code', data: content.substring(0, 50000), language: ext.slice(1) };
       }
       return { type: 'binary' };
@@ -612,19 +613,26 @@ function registerIpcHandlers(db, getMainWindow, app) {
 
   ipcMain.handle('get-thumbnails-batch', async (event, filePaths) => {
     const results = {};
-    const imageExts = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.ico', '.tiff', '.tif'];
+    const imageExts = new Set(['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.ico', '.tiff', '.tif']);
     const batch = filePaths.slice(0, 50);
-    for (let i = 0; i < batch.length; i++) {
-      const filePath = batch[i];
-      if (i > 0 && i % 10 === 0) await new Promise(r => setImmediate(r));
-      try {
-        const ext = path.extname(filePath).toLowerCase();
-        if (!imageExts.includes(ext)) continue;
-        const cached = getCachedThumbnail(filePath, cacheDir);
-        if (cached) { results[filePath] = cached; continue; }
-        const generated = generateThumbnail(filePath, cacheDir);
-        if (generated) results[filePath] = generated;
-      } catch (e) {}
+
+    const CONCURRENCY = 4;
+    for (let i = 0; i < batch.length; i += CONCURRENCY) {
+      const chunk = batch.slice(i, i + CONCURRENCY);
+      const chunkResults = await Promise.all(chunk.map(async (filePath) => {
+        try {
+          const ext = path.extname(filePath).toLowerCase();
+          if (!imageExts.has(ext)) return null;
+          const cached = getCachedThumbnail(filePath, cacheDir);
+          if (cached) return { filePath, data: cached };
+          const generated = generateThumbnail(filePath, cacheDir);
+          if (generated) return { filePath, data: generated };
+        } catch (e) {}
+        return null;
+      }));
+      for (const r of chunkResults) {
+        if (r) results[r.filePath] = r.data;
+      }
     }
     return results;
   });
@@ -702,12 +710,13 @@ function registerIpcHandlers(db, getMainWindow, app) {
   ipcMain.handle('window-close', () => getMainWindow()?.close());
 }
 
-function clearThumbnailCache(app) {
+async function clearThumbnailCache(app) {
   const dir = path.join(app.getPath('userData'), 'thumbnails');
-  if (!fs.existsSync(dir)) return;
-  for (const file of fs.readdirSync(dir)) {
-    fs.unlinkSync(path.join(dir, file));
-  }
+  try {
+    await fs.promises.rm(dir, { recursive: true, force: true });
+    await fs.promises.mkdir(dir, { recursive: true });
+  } catch (e) {}
+  thumbBase64Cache.clear();
 }
 
 module.exports = { registerIpcHandlers, clearThumbnailCache };

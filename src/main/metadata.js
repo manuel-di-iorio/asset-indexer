@@ -3,12 +3,12 @@ const path = require('path');
 
 const MAX_HEAD = 64 * 1024;
 
-function readHead(filePath) {
+async function readHead(filePath) {
   try {
-    const fd = fs.openSync(filePath, 'r');
+    const fd = await fs.promises.open(filePath, 'r');
     const buf = Buffer.alloc(MAX_HEAD);
-    const bytesRead = fs.readSync(fd, buf, 0, MAX_HEAD, 0);
-    fs.closeSync(fd);
+    const { bytesRead } = await fd.read(buf, 0, MAX_HEAD, 0);
+    await fd.close();
     return buf.subarray(0, bytesRead);
   } catch (e) {
     return null;
@@ -158,8 +158,8 @@ function parseKTX(b) {
   };
 }
 
-function extractImageMetadata(filePath) {
-  const b = readHead(filePath);
+async function extractImageMetadata(filePath) {
+  const b = await readHead(filePath);
   if (!b || b.length < 4) return null;
   const ext = path.extname(filePath).toLowerCase();
   switch (ext) {

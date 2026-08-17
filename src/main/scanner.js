@@ -1,17 +1,18 @@
 const path = require('path');
 const fs = require('fs');
-const { ALL_EXTENSIONS, getAssetCategory } = require('./constants');
+const { ALL_EXTENSIONS_SET, getAssetCategory } = require('./constants');
 const { extractImageMetadata } = require('./metadata');
 
-function metadataFor(filePath, category) {
+const BATCH_SIZE = 500;
+
+async function metadataFor(filePath, category) {
   if (category !== 'images') return null;
-  const meta = extractImageMetadata(filePath);
+  const meta = await extractImageMetadata(filePath);
   if (!meta) return null;
   return [meta.width, meta.height, meta.bitDepth, meta.hasAlpha];
 }
 
-async function getAllFiles(dirPath, ignoreRegex, signal) {
-  const results = [];
+async function getAllFiles(dirPath, ignoreRegex, signal, results = []) {
   let ignorePattern = null;
   if (ignoreRegex && ignoreRegex.trim()) {
     try {
@@ -35,12 +36,11 @@ async function getAllFiles(dirPath, ignoreRegex, signal) {
 
       if (entry.isDirectory()) {
         if (!entry.name.startsWith('.')) {
-          const sub = await getAllFiles(fullPath, ignoreRegex, signal);
-          results.push(...sub);
+          await getAllFiles(fullPath, ignoreRegex, signal, results);
         }
       } else {
         const ext = path.extname(entry.name).toLowerCase();
-        if (ALL_EXTENSIONS.includes(ext)) {
+        if (ALL_EXTENSIONS_SET.has(ext)) {
           results.push(fullPath);
         }
       }
@@ -68,13 +68,24 @@ async function scanDirectory(db, dirPath, libraryId, ignoreRegex, signal) {
   `);
 
   const files = await getAllFiles(dirPath, ignoreRegex, signal);
-  const insertMany = db.transaction((fileList) => {
-    for (const filePath of fileList) {
-      try {
-        const stat = fs.statSync(filePath);
-        const ext = path.extname(filePath);
+
+  for (let i = 0; i < files.length; i += BATCH_SIZE) {
+    if (signal?.aborted) break;
+    const chunk = files.slice(i, i + BATCH_SIZE);
+    const stats = await Promise.all(chunk.map(f =>
+      fs.promises.stat(f).catch(() => null)
+    ));
+    const metaResults = await Promise.all(chunk.map((f, j) => {
+      if (!stats[j]) return Promise.resolve(null);
+      const ext = path.extname(f).toLowerCase();
+      const category = getAssetCategory(ext);
+      return metadataFor(f, category);
+    }));
+
+    const insertChunk = db.transaction((entries) => {
+      for (const [filePath, stat, meta, ext] of entries) {
+        if (!stat) continue;
         const category = getAssetCategory(ext);
-        const meta = metadataFor(filePath, category);
         insertAsset.run(
           libraryId,
           filePath,
@@ -89,25 +100,28 @@ async function scanDirectory(db, dirPath, libraryId, ignoreRegex, signal) {
           meta ? meta[2] : null,
           meta ? meta[3] : null
         );
-      } catch (e) {}
-    }
-  });
+      }
+    });
+    insertChunk(chunk.map((f, j) => [f, stats[j], metaResults[j], path.extname(f)]));
+  }
 
-  insertMany(files);
   return { count: files.length, files };
 }
 
 function pruneStaleAssets(db, libraryId, existingPaths) {
-  const existing = new Set(existingPaths.map(p => p.toLowerCase()));
-  const rows = db.prepare('SELECT id, file_path FROM assets WHERE library_id = ?').all(libraryId);
-  const stale = rows.filter(r => !existing.has(r.file_path.toLowerCase())).map(r => r.id);
+  if (existingPaths.length === 0) {
+    const count = db.prepare('SELECT COUNT(*) as count FROM assets WHERE library_id = ?').get(libraryId).count;
+    if (count === 0) return 0;
+    db.prepare('DELETE FROM assets WHERE library_id = ?').run(libraryId);
+    return count;
+  }
+  const placeholders = existingPaths.map(() => '?').join(',');
+  const stale = db.prepare(`SELECT id FROM assets WHERE library_id = ? AND file_path NOT IN (${placeholders})`).all(libraryId, ...existingPaths);
   if (stale.length === 0) return 0;
-  const del = db.prepare('DELETE FROM assets WHERE id = ?');
-  const tx = db.transaction((ids) => {
-    for (const id of ids) del.run(id);
-  });
-  tx(stale);
-  return stale.length;
+  const staleIds = stale.map(r => r.id);
+  const idPlaceholders = staleIds.map(() => '?').join(',');
+  db.prepare(`DELETE FROM assets WHERE id IN (${idPlaceholders})`).run(...staleIds);
+  return staleIds.length;
 }
 
 module.exports = { scanDirectory, getAllFiles, pruneStaleAssets };

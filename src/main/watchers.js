@@ -1,22 +1,28 @@
 const path = require('path');
 const fs = require('fs');
 const chokidar = require('chokidar');
-const { ALL_EXTENSIONS, getAssetCategory } = require('./constants');
+const { ALL_EXTENSIONS_SET, getAssetCategory } = require('./constants');
 const { extractImageMetadata } = require('./metadata');
 
 let watchers = {};
 let ignoredPaths = new Set();
+let ignoreCleanupTimer = null;
 
-function metadataFor(filePath, category) {
+async function metadataFor(filePath, category) {
   if (category !== 'images') return null;
-  const meta = extractImageMetadata(filePath);
+  const meta = await extractImageMetadata(filePath);
   if (!meta) return null;
   return [meta.width, meta.height, meta.bitDepth, meta.hasAlpha];
 }
 
 function ignorePath(p) {
   ignoredPaths.add(p);
-  setTimeout(() => ignoredPaths.delete(p), 5000);
+  if (!ignoreCleanupTimer) {
+    ignoreCleanupTimer = setTimeout(() => {
+      ignoredPaths.clear();
+      ignoreCleanupTimer = null;
+    }, 7000);
+  }
 }
 
 function setupWatcher(db, mainWindow, libraryPath, libraryId, ignoreRegex) {
@@ -45,53 +51,94 @@ function setupWatcher(db, mainWindow, libraryPath, libraryId, ignoreRegex) {
     awaitWriteFinish: { stabilityThreshold: 500, pollInterval: 100 }
   });
 
-  watcher.on('add', (filePath) => {
+  const insertStmt = db.prepare(`
+    INSERT INTO assets (library_id, file_path, file_name, file_ext, file_size, modified_date, created_date, category, width, height, bit_depth, has_alpha)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(file_path) DO UPDATE SET
+      library_id = excluded.library_id,
+      file_name = excluded.file_name,
+      file_ext = excluded.file_ext,
+      file_size = excluded.file_size,
+      modified_date = excluded.modified_date,
+      created_date = excluded.created_date,
+      category = excluded.category,
+      width = excluded.width,
+      height = excluded.height,
+      bit_depth = excluded.bit_depth,
+      has_alpha = excluded.has_alpha
+  `);
+
+  let addBatch = [];
+  let updateBatch = [];
+  let removeBatch = [];
+  let flushTimer = null;
+
+  function flushEvents() {
+    flushTimer = null;
+    const win = mainWindow;
+    if (!win || win.isDestroyed()) return;
+    if (addBatch.length > 0) {
+      win.webContents.send('assets-batch-added', addBatch);
+      addBatch = [];
+    }
+    if (updateBatch.length > 0) {
+      win.webContents.send('assets-batch-updated', updateBatch);
+      updateBatch = [];
+    }
+    if (removeBatch.length > 0) {
+      win.webContents.send('assets-batch-removed', removeBatch);
+      removeBatch = [];
+    }
+  }
+
+  function scheduleFlush() {
+    if (!flushTimer) {
+      flushTimer = setTimeout(flushEvents, 500);
+    }
+  }
+
+  watcher.on('add', async (filePath) => {
     if (ignoredPaths.has(filePath)) return;
     const ext = path.extname(filePath).toLowerCase();
-    if (!ALL_EXTENSIONS.includes(ext)) return;
+    if (!ALL_EXTENSIONS_SET.has(ext)) return;
     try {
-      const stat = fs.statSync(filePath);
-      const category = getAssetCategory(ext);
-      const meta = metadataFor(filePath, category);
-      db.prepare(`
-        INSERT INTO assets (library_id, file_path, file_name, file_ext, file_size, modified_date, created_date, category, width, height, bit_depth, has_alpha)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(file_path) DO UPDATE SET
-          library_id = excluded.library_id,
-          file_name = excluded.file_name,
-          file_ext = excluded.file_ext,
-          file_size = excluded.file_size,
-          modified_date = excluded.modified_date,
-          created_date = excluded.created_date,
-          category = excluded.category,
-          width = excluded.width,
-          height = excluded.height,
-          bit_depth = excluded.bit_depth,
-          has_alpha = excluded.has_alpha
-      `).run(libraryId, filePath, path.basename(filePath), ext, stat.size, stat.mtime.toISOString(), stat.birthtime.toISOString(), category,
+      const [stat, category] = await Promise.all([
+        fs.promises.stat(filePath).catch(() => null),
+        Promise.resolve(getAssetCategory(ext))
+      ]);
+      if (!stat) return;
+      const meta = await metadataFor(filePath, category);
+      insertStmt.run(libraryId, filePath, path.basename(filePath), ext, stat.size,
+        stat.mtime.toISOString(), stat.birthtime.toISOString(), category,
         meta ? meta[0] : null, meta ? meta[1] : null, meta ? meta[2] : null, meta ? meta[3] : null);
-      mainWindow?.webContents.send('asset-added', { libraryId, filePath });
+      addBatch.push({ libraryId, filePath });
+      scheduleFlush();
     } catch (e) {}
   });
 
-  watcher.on('change', (filePath) => {
+  watcher.on('change', async (filePath) => {
     if (ignoredPaths.has(filePath)) return;
     try {
-      const stat = fs.statSync(filePath);
-      const category = getAssetCategory(path.extname(filePath).toLowerCase());
-      const meta = metadataFor(filePath, category);
+      const [stat, category] = await Promise.all([
+        fs.promises.stat(filePath).catch(() => null),
+        Promise.resolve(getAssetCategory(path.extname(filePath).toLowerCase()))
+      ]);
+      if (!stat) return;
+      const meta = await metadataFor(filePath, category);
       db.prepare(`UPDATE assets SET file_size = ?, modified_date = ?, width = ?, height = ?, bit_depth = ?, has_alpha = ? WHERE file_path = ?`)
         .run(stat.size, stat.mtime.toISOString(),
           meta ? meta[0] : null, meta ? meta[1] : null, meta ? meta[2] : null, meta ? meta[3] : null,
           filePath);
-      mainWindow?.webContents.send('asset-updated', { filePath });
+      updateBatch.push({ filePath });
+      scheduleFlush();
     } catch (e) {}
   });
 
   watcher.on('unlink', (filePath) => {
     if (ignoredPaths.has(filePath)) return;
     db.prepare(`DELETE FROM assets WHERE file_path = ?`).run(filePath);
-    mainWindow?.webContents.send('asset-removed', { filePath });
+    removeBatch.push({ filePath });
+    scheduleFlush();
   });
 
   watchers[libraryId] = watcher;

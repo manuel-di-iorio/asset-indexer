@@ -9,13 +9,17 @@ const ASSET_EXTENSIONS = {
 };
 
 const ALL_EXTENSIONS = Object.values(ASSET_EXTENSIONS).flat();
+const ALL_EXTENSIONS_SET = new Set(ALL_EXTENSIONS);
 
-function getAssetCategory(ext) {
-  const lower = ext.toLowerCase();
-  for (const [category, extensions] of Object.entries(ASSET_EXTENSIONS)) {
-    if (extensions.includes(lower)) return category;
+const CATEGORY_BY_EXT = {};
+for (const [category, extensions] of Object.entries(ASSET_EXTENSIONS)) {
+  for (const ext of extensions) {
+    CATEGORY_BY_EXT[ext] = category;
   }
-  return 'other';
 }
 
-module.exports = { ASSET_EXTENSIONS, ALL_EXTENSIONS, getAssetCategory };
+function getAssetCategory(ext) {
+  return CATEGORY_BY_EXT[ext.toLowerCase()] || 'other';
+}
+
+module.exports = { ASSET_EXTENSIONS, ALL_EXTENSIONS, ALL_EXTENSIONS_SET, getAssetCategory };

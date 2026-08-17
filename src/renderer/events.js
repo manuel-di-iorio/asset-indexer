@@ -22,6 +22,12 @@ import { showSettingsModal } from './modals/settings.js';
 let searchTimeout = null;
 let requestId = 0;
 
+let refreshDebounce = null;
+let assetUpdateDebounce = null;
+let assetRemoveDebounce = null;
+let sidebarUpdatePending = false;
+let sidebarRefreshPending = false;
+
 function safeLoadAssets() {
   const id = ++requestId;
   loadAssets().then(() => {
@@ -36,6 +42,29 @@ function doFullRefresh() {
   loadCollections().then(() => { if (id === requestId) renderCollections(); });
   loadCategoryCounts();
   loadAssets().then(() => { if (id === requestId) renderAssets(); });
+}
+
+function debouncedFullRefresh() {
+  clearTimeout(refreshDebounce);
+  refreshDebounce = setTimeout(() => doFullRefresh(), 500);
+}
+
+function debouncedAssetUpdate() {
+  clearTimeout(assetUpdateDebounce);
+  assetUpdateDebounce = setTimeout(() => safeLoadAssets(), 500);
+}
+
+function debouncedAssetRemove(data) {
+  if (data?.filePath) {
+    const removed = state.assets.find(a => a.file_path === data.filePath);
+    if (removed) removeSelectedId(removed.id);
+  }
+  clearTimeout(assetRemoveDebounce);
+  assetRemoveDebounce = setTimeout(() => {
+    safeLoadAssets();
+    loadCategoryCounts();
+    loadLibraries().then(() => renderSources());
+  }, 500);
 }
 
 export function initEventListeners() {
@@ -110,6 +139,7 @@ export function initEventListeners() {
     document.getElementById('asset-grid').classList.remove('list-view');
     document.getElementById('btn-grid-view').classList.add('active');
     document.getElementById('btn-list-view').classList.remove('active');
+    renderAssets();
   });
 
   document.getElementById('btn-list-view').addEventListener('click', () => {
@@ -117,6 +147,7 @@ export function initEventListeners() {
     document.getElementById('asset-grid').classList.add('list-view');
     document.getElementById('btn-list-view').classList.add('active');
     document.getElementById('btn-grid-view').classList.remove('active');
+    renderAssets();
   });
 
   document.getElementById('btn-toggle-inspector').addEventListener('click', () => {
@@ -158,32 +189,38 @@ export function initEventListeners() {
     setTimeout(() => { btn.innerHTML = original; }, 1500);
   });
 
-  window.api.onAssetAdded(() => doFullRefresh());
-  window.api.onAssetUpdated(() => safeLoadAssets());
-  window.api.onAssetRemoved((data) => {
-    if (data?.filePath) {
-      const removed = state.assets.find(a => a.file_path === data.filePath);
-      if (removed) removeSelectedId(removed.id);
-    }
-    safeLoadAssets();
-    loadCategoryCounts();
-    loadLibraries().then(() => renderSources());
-  });
+  window.api.onAssetAdded(() => debouncedFullRefresh());
+  window.api.onAssetUpdated(() => debouncedAssetUpdate());
+  window.api.onAssetRemoved((data) => debouncedAssetRemove(data));
+
+  window.api.onAssetsBatchAdded(() => debouncedFullRefresh());
+  window.api.onAssetsBatchUpdated(() => debouncedAssetUpdate());
+  window.api.onAssetsBatchRemoved(() => debouncedAssetRemove());
 
   document.addEventListener('sidebar-update', () => {
-    updateSidebarActive();
-    safeLoadAssets();
-    updateBreadcrumb();
-    renderSources();
-    renderTags();
-    renderCollections();
+    if (sidebarUpdatePending) return;
+    sidebarUpdatePending = true;
+    requestAnimationFrame(() => {
+      sidebarUpdatePending = false;
+      updateSidebarActive();
+      safeLoadAssets();
+      updateBreadcrumb();
+      renderSources();
+      renderTags();
+      renderCollections();
+    });
   });
 
   document.addEventListener('sidebar-refresh', () => {
-    loadTags().then(() => renderTags());
-    loadCollections().then(() => renderCollections());
-    safeLoadAssets();
-    loadCategoryCounts();
+    if (sidebarRefreshPending) return;
+    sidebarRefreshPending = true;
+    requestAnimationFrame(() => {
+      sidebarRefreshPending = false;
+      loadTags().then(() => renderTags());
+      loadCollections().then(() => renderCollections());
+      safeLoadAssets();
+      loadCategoryCounts();
+    });
   });
 
   document.addEventListener('breadcrumb-update', () => updateBreadcrumb());

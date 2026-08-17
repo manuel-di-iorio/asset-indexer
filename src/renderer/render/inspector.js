@@ -3,6 +3,9 @@ import { escapeHtml, toFileUrl, getCategoryFromExt, formatFileSize, formatDate }
 import { CATEGORY_COLORS, CATEGORY_ICONS, CATEGORY_LABELS } from '../constants.js';
 import { loadPreview } from './preview/index.js';
 
+let inspectorTagChipContainer = null;
+let inspectorCollectionChipContainer = null;
+
 function detailRow(label, value, cls = '') {
   return `
     <div class="detail-row">
@@ -37,8 +40,10 @@ function textureResolution(maxDim) {
 
 export async function selectAsset(assetId) {
   flushUsageSave();
-  usageLicenseInput().value = '';
-  usageNotesInput().value = '';
+  const licInput = usageLicenseInput();
+  const notesInput = usageNotesInput();
+  if (licInput) licInput.value = '';
+  if (notesInput) notesInput.value = '';
   const asset = await window.api.getAsset(assetId);
   if (!asset) return;
 
@@ -95,7 +100,8 @@ export function showMultiSelection(count) {
   showUsageEmpty(count);
 
   const favBtn = document.getElementById('inspector-fav-btn');
-  const selected = state.assets.filter(a => state.selectedAssetIds.includes(a.id));
+  const selectedIdSet = new Set(state.selectedAssetIds);
+  const selected = state.assets.filter(a => selectedIdSet.has(a.id));
   favBtn.classList.toggle('active', selected.length > 0 && selected.every(a => a.is_favorite));
 }
 
@@ -160,10 +166,12 @@ let usagePending = null;
 function scheduleUsageSave() {
   const ids = state.selectedAssetIds.length ? state.selectedAssetIds : (state.selectedAsset ? [state.selectedAsset.id] : []);
   if (ids.length === 0) return;
+  const licInput = usageLicenseInput();
+  const notesInput = usageNotesInput();
   usagePending = {
     ids: [...ids],
-    license: usageLicenseInput().value.trim(),
-    notes: usageNotesInput().value
+    license: licInput ? licInput.value.trim() : '',
+    notes: notesInput ? notesInput.value : ''
   };
   clearTimeout(usageSaveTimer);
   usageSaveTimer = setTimeout(flushUsageSave, 600);
@@ -185,19 +193,25 @@ function flushUsageSave() {
 
 function renderUsage(asset) {
   document.getElementById('inspector-usage').style.display = 'block';
-  if (usageMultiHint()) usageMultiHint().style.display = 'none';
-  usageLicenseInput().value = asset.license || '';
-  usageNotesInput().value = asset.notes || '';
+  const hint = usageMultiHint();
+  if (hint) hint.style.display = 'none';
+  const licInput = usageLicenseInput();
+  const notesInput = usageNotesInput();
+  if (licInput) licInput.value = asset.license || '';
+  if (notesInput) notesInput.value = asset.notes || '';
 }
 
 function showUsageEmpty(count) {
   document.getElementById('inspector-usage').style.display = 'block';
-  if (usageMultiHint()) {
-    usageMultiHint().textContent = `License/notes will be applied to all ${count} selected assets.`;
-    usageMultiHint().style.display = 'block';
+  const hint = usageMultiHint();
+  if (hint) {
+    hint.textContent = `License/notes will be applied to all ${count} selected assets.`;
+    hint.style.display = 'block';
   }
-  usageLicenseInput().value = '';
-  usageNotesInput().value = '';
+  const licInput = usageLicenseInput();
+  const notesInput = usageNotesInput();
+  if (licInput) licInput.value = '';
+  if (notesInput) notesInput.value = '';
 }
 
 const licenseInputEl = usageLicenseInput();
@@ -211,14 +225,57 @@ if (notesInputEl) {
   notesInputEl.addEventListener('blur', flushUsageSave);
 }
 
+let tagChipDelegationSetup = false;
+let colChipDelegationSetup = false;
+
+function setupTagChipDelegation() {
+  if (tagChipDelegationSetup) return;
+  tagChipDelegationSetup = true;
+  const container = document.getElementById('inspector-tag-chips');
+  if (!container) return;
+  container.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.tag-remove');
+    if (!btn) return;
+    e.stopPropagation();
+    const tagId = parseInt(btn.dataset.tagId);
+    if (tagId && state.selectedAsset) {
+      await window.api.removeTagFromAsset(state.selectedAsset.id, tagId);
+      await selectAsset(state.selectedAsset.id);
+      document.dispatchEvent(new CustomEvent('sidebar-refresh'));
+    }
+  });
+}
+
+function setupCollectionChipDelegation() {
+  if (colChipDelegationSetup) return;
+  colChipDelegationSetup = true;
+  const container = document.getElementById('inspector-collection-chips');
+  if (!container) return;
+  container.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.tag-remove');
+    if (!btn) return;
+    e.stopPropagation();
+    const colId = parseInt(btn.dataset.collectionId);
+    if (colId && state.selectedAsset) {
+      await window.api.removeAssetFromCollection(state.selectedAsset.id, colId);
+      await selectAsset(state.selectedAsset.id);
+      document.dispatchEvent(new CustomEvent('sidebar-refresh'));
+    }
+  });
+}
+
 export function renderAssetTags(asset) {
   const container = document.getElementById('inspector-tag-chips');
+  setupTagChipDelegation();
+
   const tagNames = asset.tags ? asset.tags.split(',') : [];
   const tagColors = asset.tag_colors ? asset.tag_colors.split(',') : [];
 
+  const tagMap = new Map(state.tags.map(t => [t.name, t]));
+
   container.innerHTML = tagNames.map((name, i) => {
     const color = tagColors[i] || '#7c3aed';
-    const tag = state.tags.find(t => t.name === name);
+    const tag = tagMap.get(name);
     return `
       <div class="tag-chip" style="border-color: ${color}40">
         <div class="tag-dot" style="background: ${color}"></div>
@@ -231,26 +288,18 @@ export function renderAssetTags(asset) {
   if (tagNames.length === 0) {
     container.innerHTML = '<span style="font-size:11px; color:var(--text-muted)">No tags</span>';
   }
-
-  container.querySelectorAll('.tag-remove').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const tagId = parseInt(btn.dataset.tagId);
-      if (tagId && state.selectedAsset) {
-        await window.api.removeTagFromAsset(state.selectedAsset.id, tagId);
-        await selectAsset(state.selectedAsset.id);
-        document.dispatchEvent(new CustomEvent('sidebar-refresh'));
-      }
-    });
-  });
 }
 
 export function renderAssetCollections(asset) {
   const container = document.getElementById('inspector-collection-chips');
+  setupCollectionChipDelegation();
+
   const collectionNames = asset.collections ? asset.collections.split(',') : [];
 
+  const colMap = new Map(state.collections.map(c => [c.name, c]));
+
   container.innerHTML = collectionNames.map(name => {
-    const col = state.collections.find(c => c.name === name);
+    const col = colMap.get(name);
     return `
       <div class="tag-chip" style="border-color: var(--accent)40">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
@@ -263,16 +312,4 @@ export function renderAssetCollections(asset) {
   if (collectionNames.length === 0) {
     container.innerHTML = '<span style="font-size:11px; color:var(--text-muted)">No collections</span>';
   }
-
-  container.querySelectorAll('.tag-remove').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const colId = parseInt(btn.dataset.collectionId);
-      if (colId && state.selectedAsset) {
-        await window.api.removeAssetFromCollection(state.selectedAsset.id, colId);
-        await selectAsset(state.selectedAsset.id);
-        document.dispatchEvent(new CustomEvent('sidebar-refresh'));
-      }
-    });
-  });
 }

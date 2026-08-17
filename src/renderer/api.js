@@ -1,8 +1,12 @@
 import { state } from './state.js';
 
+export const INITIAL_PAGE_SIZE = 150;
 export const PAGE_SIZE = 500;
 
 let assetsToken = 0;
+
+let countLabelEl = null;
+let statusSelectedEl = null;
 
 function buildParams(offset, limit) {
   return {
@@ -19,8 +23,10 @@ function buildParams(offset, limit) {
 }
 
 function updateCountLabels() {
-  document.getElementById('asset-count-label').textContent = `${state.totalCount.toLocaleString()} assets`;
-  document.getElementById('status-selected').textContent = state.selectedAssetIds.length ? `${state.selectedAssetIds.length} selected` : '0 selected';
+  if (!countLabelEl) countLabelEl = document.getElementById('asset-count-label');
+  if (!statusSelectedEl) statusSelectedEl = document.getElementById('status-selected');
+  if (countLabelEl) countLabelEl.textContent = `${state.totalCount.toLocaleString()} assets`;
+  if (statusSelectedEl) statusSelectedEl.textContent = state.selectedAssetIds.length ? `${state.selectedAssetIds.length} selected` : '0 selected';
 }
 
 export async function loadLibraries() {
@@ -36,28 +42,39 @@ export async function loadCollections() {
 }
 
 export async function loadCategoryCounts() {
-  const counts = await window.api.getCategoryCounts();
-  const total = await window.api.getTotalAssets();
-  const favCount = await window.api.getAssetCount({ favorites: true });
+  const [counts, total, favCount] = await Promise.all([
+    window.api.getCategoryCounts(),
+    window.api.getTotalAssets(),
+    window.api.getAssetCount({ favorites: true })
+  ]);
 
-  document.getElementById('count-all').textContent = total.toLocaleString();
-  document.getElementById('count-favorites').textContent = favCount.toLocaleString();
+  const countAllEl = document.getElementById('count-all');
+  const countFavEl = document.getElementById('count-favorites');
+  if (countAllEl) countAllEl.textContent = total.toLocaleString();
+  if (countFavEl) countFavEl.textContent = favCount.toLocaleString();
 
   ['audio', '3d-models', 'materials', 'images', 'scripts', 'videos', 'documents'].forEach(cat => {
     const el = document.getElementById(`count-${cat}`);
     if (el) el.textContent = (counts[cat] || 0).toLocaleString();
   });
 
-  document.getElementById('status-total').textContent = `${total.toLocaleString()} assets`;
-  document.getElementById('status-libraries').textContent = `${state.libraries.length} libs`;
+  const statusTotalEl = document.getElementById('status-total');
+  const statusLibsEl = document.getElementById('status-libraries');
+  if (statusTotalEl) statusTotalEl.textContent = `${total.toLocaleString()} assets`;
+  if (statusLibsEl) statusLibsEl.textContent = `${state.libraries.length} libs`;
 }
 
 export async function loadAssets() {
   const token = ++assetsToken;
-  state.assets = await window.api.getAssets(buildParams(0, PAGE_SIZE));
+  const params = buildParams(0, INITIAL_PAGE_SIZE);
+  const countParams = buildParams(0);
+  const [assets, totalCount] = await Promise.all([
+    window.api.getAssets(params),
+    window.api.getAssetCount(countParams)
+  ]);
   if (token !== assetsToken) return;
-  state.totalCount = await window.api.getAssetCount(buildParams(0));
-  if (token !== assetsToken) return;
+  state.assets = assets;
+  state.totalCount = totalCount;
   state.hasMore = state.assets.length < state.totalCount;
   updateCountLabels();
 }
